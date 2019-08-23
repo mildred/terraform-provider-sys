@@ -1,16 +1,16 @@
 ---
-layout: "local"
-page_title: "Local: local_file"
-sidebar_current: "docs-local-resource-file"
+layout: "remote"
+page_title: "Remote: remote_file"
+sidebar_current: "docs-remote-resource-file"
 description: |-
-  Generates a local file from content.
+  Generates a remote file from content.
 ---
 
-# local_file
+# remote_file
 
-Generates a local file with the given content.
+Generates a remote file with the given content.
 
-~> **Note** When working with local files, Terraform will detect the resource
+~> **Note** When working with remote files, Terraform will detect the resource
 as having been deleted each time a configuration is applied on a new machine
 where the file is not present and will generate a diff to re-create it. This
 may cause "noise" in diffs in environments where configurations are routinely
@@ -19,7 +19,7 @@ applied by many different users or within automation systems.
 ## Example Usage
 
 ```hcl
-resource "local_file" "foo" {
+resource "remote_file" "foo" {
     content     = "foo!"
     filename = "${path.module}/foo.bar"
 }
@@ -28,6 +28,8 @@ resource "local_file" "foo" {
 ## Argument Reference
 
 The following arguments are supported:
+
+* `conn` - (Required) The connection string.
 
 * `content` - (Optional) The content of file to create. Conflicts with `sensitive_content` and `content_base64`.
 

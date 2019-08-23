@@ -1,19 +1,19 @@
 ---
-layout: "local"
-page_title: "Local: local_file"
-sidebar_current: "docs-local-datasource-file"
+layout: "remote"
+page_title: "Remote: remote_file"
+sidebar_current: "docs-remote-datasource-file"
 description: |-
-  Reads a file from the local filesystem.
+  Reads a file from the remote filesystem.
 ---
 
-# local_file
+# remote_file
 
-`local_file` reads a file from the local filesystem.
+`remote_file` reads a file from the remote filesystem.
 
 ## Example Usage
 
 ```hcl
-data "local_file" "foo" {
+data "remote_file" "foo" {
     filename = "${path.module}/foo.bar"
 }
 ```
@@ -22,6 +22,7 @@ data "local_file" "foo" {
 
 The following argument is required:
 
+* `conn` - (Required) The connection string.
 * `filename` - (Required) The path to the file that will be read. The data
   source will return an error if the file does not exist.
 

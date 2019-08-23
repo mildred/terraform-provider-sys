@@ -1,12 +1,18 @@
 TEST?=$$(go list ./... |grep -v 'vendor')
 GOFMT_FILES?=$$(find . -name '*.go' |grep -v vendor)
 WEBSITE_REPO=github.com/hashicorp/terraform-website
-PKG_NAME=local
+PKG_NAME=sys
+
+export GO111MODULE=on
 
 default: build
 
 build: fmtcheck
 	go install
+
+user-install:
+	mkdir -p ~/.terraform.d/plugins
+	go build -o ~/.terraform.d/plugins/terraform-provider-$(PKG_NAME) .
 
 test: fmtcheck
 	go test -i $(TEST) || exit 1

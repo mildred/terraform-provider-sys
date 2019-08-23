@@ -1,16 +1,17 @@
 Terraform Provider
 ==================
 
-- Website: https://www.terraform.io
-- [![Gitter chat](https://badges.gitter.im/hashicorp-terraform/Lobby.png)](https://gitter.im/hashicorp-terraform/Lobby)
-- Mailing list: [Google Groups](http://groups.google.com/group/terraform-tool)
+The sys terraform provider allows provisionning configuration management
+resource to local hosts. This is the equivalent of the `local` terraform
+provider, but with more features, including script resources.
 
-<img src="https://cdn.rawgit.com/hashicorp/terraform-website/master/content/source/assets/images/logo-hashicorp.svg" width="600px">
+The idea was that traditional configuration management tools were lacking
+important features that terraform has. In particular the tfstate is a great
+feature that allows to rollback the deployment to its initial state. With
+configuration management tools, the only source of truth is your code and when
+you modify it, some resources created from previous executions might be left
+over, creating some unclean state.
 
-Maintainers
------------
-
-This provider plugin is maintained by the Terraform team at [HashiCorp](https://www.hashicorp.com/).
 
 Requirements
 ------------
@@ -21,26 +22,19 @@ Requirements
 Building The Provider
 ---------------------
 
-Clone repository to: `$GOPATH/src/github.com/terraform-providers/terraform-provider-local`
-
-```sh
-$ mkdir -p $GOPATH/src/github.com/terraform-providers; cd $GOPATH/src/github.com/terraform-providers
-$ git clone git@github.com:terraform-providers/terraform-provider-local
-```
-
-Enter the provider directory and build the provider
-
-```sh
-$ cd $GOPATH/src/github.com/terraform-providers/terraform-provider-local
-$ make build
-```
+Run `make build` outside GOPATH or with `GO111MODULE=on`
 
 Using the provider
-----------------------
-## Fill in for each provider
+------------------
+
+Place the `terraform-provider-remote` executable in `~/.terraform.d/plugins`
+
+You can do so with `make user-install`
+
+See: https://www.terraform.io/docs/configuration/providers.html#third-party-plugins
 
 Developing the Provider
----------------------------
+-----------------------
 
 If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (version 1.11+ is *required*). You'll also need to correctly setup a [GOPATH](http://golang.org/doc/code.html#GOPATH), as well as adding `$GOPATH/bin` to your `$PATH`.
 
@@ -49,7 +43,7 @@ To compile the provider, run `make build`. This will build the provider and put 
 ```sh
 $ make bin
 ...
-$ $GOPATH/bin/terraform-provider-local
+$ $GOPATH/bin/terraform-provider-remote
 ...
 ```
 
