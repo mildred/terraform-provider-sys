@@ -13,6 +13,7 @@ func Provider() terraform.ResourceProvider {
 			"sys_dir":          resourceDir(),
 			"sys_shell_script": resourceShellScript(),
 			"sys_symlink":      resourceSymlink(),
+			"sys_null":         resourceNull(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"sys_file": dataSourceFile(),
