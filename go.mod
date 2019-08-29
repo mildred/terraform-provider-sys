@@ -1,4 +1,4 @@
-module github.com/mildred/terraform-provider-remote
+module github.com/mildred/terraform-provider-sys
 
 require (
 	github.com/hashicorp/go-getter v1.3.0

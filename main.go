@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hashicorp/terraform/plugin"
-	"github.com/mildred/terraform-provider-remote/sys"
+	"github.com/mildred/terraform-provider-sys/sys"
 )
 
 func main() {

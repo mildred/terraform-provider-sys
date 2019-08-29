@@ -11,6 +11,7 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/mildred/terraform-provider-sys/sys/utils"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -20,6 +21,7 @@ func resourceFile() *schema.Resource {
 		Create: resourceFileCreate,
 		Read:   resourceFileRead,
 		Delete: resourceFileDelete,
+		Update: resourceFileUpdate,
 
 		Schema: map[string]*schema.Schema{
 			"content": {
@@ -69,6 +71,12 @@ func resourceFile() *schema.Resource {
 				Default:      "0777",
 				ValidateFunc: validateMode,
 			},
+			"force_overwrite": {
+				Type:        schema.TypeBool,
+				Description: "Force overwrite an existing file",
+				Optional:    true,
+				Default:     false,
+			},
 		},
 	}
 }
@@ -76,9 +84,18 @@ func resourceFile() *schema.Resource {
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// If the output file doesn't exist, mark the resource for creation.
 	outputPath := d.Get("filename").(string)
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+	st, err := os.Stat(outputPath)
+	if os.IsNotExist(err) {
 		d.SetId("")
 		return nil
+	}
+
+	same, err := utils.FileModeSame(d.Get("file_permission").(string), st.Mode(), utils.Umask)
+	if err != nil {
+		return err
+	}
+	if ! same {
+		d.Set("file_permission", st.Mode().String())
 	}
 
 	// Verify that the content of the destination file matches the content we
@@ -112,7 +129,24 @@ func resourceFileContent(d *schema.ResourceData) ([]byte, bool, error) {
 	return nil, false, nil
 }
 
+func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
+	destination := d.Get("path").(string)
+
+	if d.HasChange("file_permission") {
+		perm := d.Get("file_permission").(string)
+		modeInt, _ := strconv.ParseInt(perm, 8, 64)
+		mode := os.FileMode(modeInt)
+
+		err := os.Chmod(destination, mode)
+		if err != nil {
+			return fmt.Errorf("cannot chmod %s, %s", mode, err)
+		}
+	}
+	return nil
+}
+
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
+	forceOverwrite := d.Get("force_overwrite").(bool)
 	source, sourceSpecified := d.GetOk("source")
 	content, contentSpecified, err := resourceFileContent(d)
 	if err != nil {
@@ -135,6 +169,11 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	fileMode, _ := strconv.ParseInt(filePerm, 8, 64)
 
 	if sourceSpecified {
+		if !forceOverwrite {
+			if _, err := os.Lstat(destination); err == nil || !os.IsNotExist(err) {
+				return fmt.Errorf("destination file exists at %v", destination)
+			}
+		}
 		err = getter.GetFile(destination, source.(string))
 		if err != nil {
 			return fmt.Errorf("cannot fetch source %v, %v", source, err)
@@ -142,7 +181,24 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	}
 
 	if contentSpecified {
-		err = ioutil.WriteFile(destination, []byte(content), os.FileMode(fileMode))
+		data := []byte(content)
+		flags := os.O_WRONLY | os.O_CREATE
+		if forceOverwrite {
+			flags = flags | os.O_EXCL
+		} else {
+			flags = flags | os.O_TRUNC
+		}
+		f, err := os.OpenFile(destination, flags, os.FileMode(fileMode))
+		if err != nil {
+			return fmt.Errorf("cannot write file, %v", err)
+		}
+		n, err := f.Write(data)
+		if err == nil && n < len(data) {
+			err = io.ErrShortWrite
+		}
+		if err1 := f.Close(); err == nil {
+			err = err1
+		}
 		if err != nil {
 			return fmt.Errorf("cannot write file, %v", err)
 		}
