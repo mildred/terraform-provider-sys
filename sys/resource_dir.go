@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/mildred/terraform-provider-sys/sys/utils"
-	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func resourceDir() *schema.Resource {

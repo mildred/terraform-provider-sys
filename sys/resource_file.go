@@ -13,7 +13,7 @@ import (
 
 	"github.com/mildred/terraform-provider-sys/sys/utils"
 	"github.com/hashicorp/go-getter"
-	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func resourceFile() *schema.Resource {
@@ -77,8 +77,84 @@ func resourceFile() *schema.Resource {
 				Optional:    true,
 				Default:     false,
 			},
+			"systemd": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem:     &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"unit": {
+							Type:        schema.TypeString,
+							Description: "Name of the unit",
+							Required:    true,
+						},
+						"enable": {
+							Type:        schema.TypeBool,
+							Description: "Enable the unit",
+							Optional:    true,
+						},
+						"start": {
+							Type:        schema.TypeBool,
+							Description: "Start the unit",
+							Optional:    true,
+						},
+					},
+				},
+			},
 		},
 	}
+}
+
+type resourceFileSystemd struct {
+	unit       string
+	enable     bool
+	has_enable bool
+	start      bool
+	has_start  bool
+	old_enable bool
+	had_enable bool
+	old_start  bool
+	had_start  bool
+}
+
+func resourceFileReadSystemd(d *schema.ResourceData) map[string]resourceFileSystemd {
+	oldVal, newVal := d.GetChange("systemd")
+	res := map[string]resourceFileSystemd{}
+
+	if oldVal != nil {
+		for _, raw := range oldVal.([]interface{}) {
+			sd := raw.(map[string]interface{})
+			var r resourceFileSystemd
+			r.unit = sd["unit"].(string)
+			r.had_enable = sd["enable"] != nil
+			if r.had_enable {
+				r.old_enable = sd["enable"].(bool)
+			}
+			r.had_start = sd["start"] != nil
+			if r.had_start {
+				r.old_start = sd["start"].(bool)
+			}
+			res[r.unit] = r
+		}
+	}
+
+	if newVal != nil {
+		for _, raw := range newVal.([]interface{}) {
+			sd := raw.(map[string]interface{})
+			unit := sd["unit"].(string)
+			r := res[unit]
+			r.has_enable = sd["enable"] != nil
+			if r.has_enable {
+				r.enable = sd["enable"].(bool)
+			}
+			r.has_start = sd["start"] != nil
+			if r.has_start {
+				r.start = sd["start"].(bool)
+			}
+			res[r.unit] = r
+		}
+	}
+
+	return res
 }
 
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
@@ -142,6 +218,19 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 			return fmt.Errorf("cannot chmod %s, %s", mode, err)
 		}
 	}
+
+	reload := false
+	for unit, sd := range resourceFileReadSystemd(d) {
+		if !reload {
+			err := systemdDaemonReload()
+			if err != nil {
+				return err
+			}
+			reload = true
+		}
+		systemdStartStop(unit, true, sd.enable, sd.start)
+	}
+
 	return nil
 }
 
@@ -224,6 +313,18 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		d.SetId(hex.EncodeToString(checksum[:]))
 	}
 
+	reload := false
+	for unit, sd := range resourceFileReadSystemd(d) {
+		if !reload {
+			err := systemdDaemonReload()
+			if err != nil {
+				return err
+			}
+			reload = true
+		}
+		systemdStartStop(unit, true, sd.enable, sd.start)
+	}
+
 	return nil
 }
 
@@ -232,5 +333,18 @@ func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
 	if err != nil {
 		return fmt.Errorf("cannot delete file, %v", err)
 	}
+
+	reload := false
+	for unit, sd := range resourceFileReadSystemd(d) {
+		if !reload {
+			err := systemdDaemonReload()
+			if err != nil {
+				return err
+			}
+			reload = true
+		}
+		systemdStartStop(unit, false, sd.old_enable, sd.old_start)
+	}
+
 	return nil
 }

@@ -1,8 +1,8 @@
 package sys
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/terraform"
 )
 
 func Provider() terraform.ResourceProvider {
@@ -14,6 +14,7 @@ func Provider() terraform.ResourceProvider {
 			"sys_shell_script": resourceShellScript(),
 			"sys_symlink":      resourceSymlink(),
 			"sys_null":         resourceNull(),
+			"sys_package":      resourcePackage(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"sys_file": dataSourceFile(),

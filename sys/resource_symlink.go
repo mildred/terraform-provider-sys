@@ -3,7 +3,7 @@ package sys
 import (
 	"os"
 
-	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
 
 func resourceSymlink() *schema.Resource {
