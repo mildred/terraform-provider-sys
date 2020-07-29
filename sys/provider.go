@@ -1,11 +1,13 @@
 package sys
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"context"
+
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 )
 
-func Provider() terraform.ResourceProvider {
+func Provider() *schema.Provider {
 	return &schema.Provider{
 		Schema: map[string]*schema.Schema{},
 		ResourcesMap: map[string]*schema.Resource{
@@ -15,9 +17,21 @@ func Provider() terraform.ResourceProvider {
 			"sys_symlink":      resourceSymlink(),
 			"sys_null":         resourceNull(),
 			"sys_package":      resourcePackage(),
+			"sys_systemd_unit": resourceSystemdUnit(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"sys_file": dataSourceFile(),
 		},
+		ConfigureContextFunc: providerConfigure,
 	}
+}
+
+type providerConfiguration struct {
+	debUpdated bool
+}
+
+func providerConfigure(ctx context.Context, data *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	configuration := &providerConfiguration{
+	}
+	return configuration, nil
 }

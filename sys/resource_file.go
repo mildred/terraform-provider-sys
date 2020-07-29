@@ -13,7 +13,7 @@ import (
 
 	"github.com/mildred/terraform-provider-sys/sys/utils"
 	"github.com/hashicorp/go-getter"
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func resourceFile() *schema.Resource {
@@ -219,6 +219,7 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 		}
 	}
 
+	/*
 	reload := false
 	for unit, sd := range resourceFileReadSystemd(d) {
 		if !reload {
@@ -228,8 +229,9 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 			}
 			reload = true
 		}
-		systemdStartStop(unit, true, sd.enable, sd.start)
+		systemdUpdnStartEnable(unit, true, sd.enable, sd.start)
 	}
+	*/
 
 	return nil
 }
@@ -313,6 +315,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		d.SetId(hex.EncodeToString(checksum[:]))
 	}
 
+	/*
 	reload := false
 	for unit, sd := range resourceFileReadSystemd(d) {
 		if !reload {
@@ -322,8 +325,9 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 			}
 			reload = true
 		}
-		systemdStartStop(unit, true, sd.enable, sd.start)
+		systemdUpdnStartEnable(unit, true, sd.enable, sd.start)
 	}
+	*/
 
 	return nil
 }
@@ -334,6 +338,7 @@ func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
 		return fmt.Errorf("cannot delete file, %v", err)
 	}
 
+	/*
 	reload := false
 	for unit, sd := range resourceFileReadSystemd(d) {
 		if !reload {
@@ -343,8 +348,9 @@ func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
 			}
 			reload = true
 		}
-		systemdStartStop(unit, false, sd.old_enable, sd.old_start)
+		systemdUpdnStartEnable(unit, false, sd.old_enable, sd.old_start)
 	}
+	*/
 
 	return nil
 }
