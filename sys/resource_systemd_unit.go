@@ -82,8 +82,12 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 		if err != nil {
 			errs = append(errs, diag.Errorf("error running systemd is-active: %v", err)...)
 		} else {
-			d.Set("start", active)
-			d.Set("stop", !active)
+			if _, ok := d.GetOk("start"); ok {
+				d.Set("start", active)
+			}
+			if _, ok := d.GetOk("stop"); ok {
+				d.Set("stop", !active)
+			}
 			rollback["active"] = strconv.FormatBool(active)
 		}
 
@@ -91,8 +95,12 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 		if err != nil {
 			errs = append(errs, diag.Errorf("error running systemd is-enabled: %v", err)...)
 		} else {
-			d.Set("enable", enabled)
-			d.Set("disable", !enabled)
+			if _, ok := d.GetOk("enable"); ok {
+				d.Set("enable", enabled)
+			}
+			if _, ok := d.GetOk("disable"); ok {
+				d.Set("disable", !enabled)
+			}
 			rollback["enabled"] = strconv.FormatBool(enabled)
 		}
 	}
