@@ -45,6 +45,12 @@ func resourceSystemdUnit() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"start"},
 			},
+			"restart_on": {
+				Type:        schema.TypeMap,
+				Description: "Restart unit if this changes",
+				Optional:    true,
+				ForceNew:    true,
+			},
 			"rollback": {
 				Type:        schema.TypeMap,
 				Description: "Rollback information to restore once the unit is destroyed",
@@ -55,10 +61,11 @@ func resourceSystemdUnit() *schema.Resource {
 }
 
 func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	log := m.(*providerConfiguration).Logger
 	var errs diag.Diagnostics
 	unit := d.Get("name").(string)
 
-	err := systemdDaemonReload()
+	err := systemdDaemonReload(log)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
@@ -116,7 +123,8 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 }
 
 func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	err := systemdDaemonReload()
+	log := m.(*providerConfiguration).Logger
+	err := systemdDaemonReload(log)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
@@ -130,18 +138,19 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 }
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	log := m.(*providerConfiguration).Logger
 	unit := d.Get("name").(string)
 
 	rollback := d.Get("rollback").(map[string]interface{})
 	rollback_start := parseBoolDef(rollback["active"], false)
 	rollback_enable := parseBoolDef(rollback["enabled"], false)
 
-	err := systemdDaemonReload()
+	err := systemdDaemonReload(log)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	err = systemdStartStopEnableDisable(unit, rollback_start, !rollback_start, rollback_enable, !rollback_enable)
+	err = systemdStartStopEnableDisable(log, unit, rollback_start, !rollback_start, rollback_enable, !rollback_enable)
 	if err != nil {
 		return diag.Errorf("cannot delete: %v", err)
 	}
@@ -155,6 +164,7 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 }
 
 func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	log := m.(*providerConfiguration).Logger
 	unit := d.Get("name").(string)
 	start := d.Get("start").(bool)
 	stop := d.Get("stop").(bool)
@@ -175,12 +185,12 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 		disable = !rollback_enable
 	}
 
-	err := systemdDaemonReload()
+	err := systemdDaemonReload(log)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	err = systemdStartStopEnableDisable(unit, start, stop, enable, disable)
+	err = systemdStartStopEnableDisable(log, unit, start, stop, enable, disable)
 	if err != nil {
 		return diag.Errorf("cannot start/enable unit: %v", err)
 	}

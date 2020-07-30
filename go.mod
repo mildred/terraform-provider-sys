@@ -2,6 +2,7 @@ module github.com/mildred/terraform-provider-sys
 
 require (
 	github.com/hashicorp/go-getter v1.4.2-0.20200106182914-9813cbd4eb02
+	github.com/hashicorp/go-hclog v0.9.2
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/terraform v0.12.2
 	github.com/hashicorp/terraform-plugin-sdk v1.15.0

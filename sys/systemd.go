@@ -1,15 +1,18 @@
 package sys
 
 import (
-	"os/exec"
-	"bytes"
-	"strings"
 	"bufio"
+	"bytes"
 	"fmt"
+	"os/exec"
+	"strings"
+
+	hclog "github.com/hashicorp/go-hclog"
 )
 
-func systemdDaemonReload() error {
+func systemdDaemonReload(log hclog.Logger) error {
 	stderr := new(bytes.Buffer)
+	log.Trace("systemctl daemon-reload")
 	cmd := exec.Command("systemctl", "daemon-reload")
 	cmd.Stderr = stderr
 	err := cmd.Run()
@@ -65,23 +68,29 @@ func systemdIsEnabled(unit string) (bool, error) {
 	return true, nil
 }
 
-func systemdUpdnStartEnable(unit string, up, start, enable bool) error {
+func systemdUpdnStartEnable(log hclog.Logger, unit string, up, start, enable bool) error {
 	stderr := new(bytes.Buffer)
 	var cmd *exec.Cmd
 	if up {
 		if enable && start {
+			log.Trace("systemctl enable --now %s", unit)
 			cmd = exec.Command("systemctl", "enable", "--now", unit)
 		} else if enable {
+			log.Trace("systemctl enable %s", unit)
 			cmd = exec.Command("systemctl", "enable", unit)
 		} else if start {
+			log.Trace("systemctl start %s", unit)
 			cmd = exec.Command("systemctl", "start", unit)
 		}
 	} else {
 		if enable && start {
+			log.Trace("systemctl disable --now %s", unit)
 			cmd = exec.Command("systemctl", "disable", "--now", unit)
 		} else if enable {
+			log.Trace("systemctl disable %s", unit)
 			cmd = exec.Command("systemctl", "disable", unit)
 		} else if start {
+			log.Trace("systemctl stop %s", unit)
 			cmd = exec.Command("systemctl", "stop", unit)
 		}
 	}
@@ -93,35 +102,35 @@ func systemdUpdnStartEnable(unit string, up, start, enable bool) error {
 	return nil
 }
 
-func systemdStartStopEnableDisable(unit string, start, stop, enable, disable bool) error {
+func systemdStartStopEnableDisable(log hclog.Logger, unit string, start, stop, enable, disable bool) error {
 	if (start && stop) || (enable && disable) {
 		return fmt.Errorf("Internal error, requesting conflicting orders start=%b stop=%b enable=%b disable=%b", start, stop, enable, disable)
 	}
 
-        if enable && start {
-                return systemdUpdnStartEnable(unit, true, true, true)
-        } else if enable && stop {
-                err := systemdUpdnStartEnable(unit, true, false, true)
-                if err != nil {
-                        return err
-                }
-                return systemdUpdnStartEnable(unit, false, true, false)
-        } else if enable {
-                return systemdUpdnStartEnable(unit, true, true, true)
-        } else if disable && stop {
-                return systemdUpdnStartEnable(unit, false, true, true)
-        } else if disable && start {
-                err := systemdUpdnStartEnable(unit, false, false, true)
-                if err != nil {
-                        return err
-                }
-                return systemdUpdnStartEnable(unit, true, true, false)
-        } else if disable {
-                return systemdUpdnStartEnable(unit, false, false, true)
-        } else if start {
-                return systemdUpdnStartEnable(unit, true, true, false)
-        } else if stop {
-                return systemdUpdnStartEnable(unit, false, true, false)
-        }
-        return nil
+	if enable && start {
+		return systemdUpdnStartEnable(log, unit, true, true, true)
+	} else if enable && stop {
+		err := systemdUpdnStartEnable(log, unit, true, false, true)
+		if err != nil {
+			return err
+		}
+		return systemdUpdnStartEnable(log, unit, false, true, false)
+	} else if enable {
+		return systemdUpdnStartEnable(log, unit, true, true, true)
+	} else if disable && stop {
+		return systemdUpdnStartEnable(log, unit, false, true, true)
+	} else if disable && start {
+		err := systemdUpdnStartEnable(log, unit, false, false, true)
+		if err != nil {
+			return err
+		}
+		return systemdUpdnStartEnable(log, unit, true, true, false)
+	} else if disable {
+		return systemdUpdnStartEnable(log, unit, false, false, true)
+	} else if start {
+		return systemdUpdnStartEnable(log, unit, true, true, false)
+	} else if stop {
+		return systemdUpdnStartEnable(log, unit, false, true, false)
+	}
+	return nil
 }
