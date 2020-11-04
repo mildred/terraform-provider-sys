@@ -60,3 +60,15 @@ In order to run the full suite of Acceptance tests, run `make testacc`.
 ```sh
 $ make testacc
 ```
+
+Making a release
+----------------
+
+From the [upstream documentation](https://www.terraform.io/docs/registry/providers/publishing.html):
+
+- `export GPG_FINGERPRINT=01230FD4CC29DE17`
+- `export GITHUB_TOKEN=...`
+- Cache passphrase with `gpg --armor --detach-sign --local-user $GPG_FINGERPRINT </dev/null`
+- Create tag: `git tag -s -u $GPG_FINGERPRINT vx.x.x`
+- Make release: `goreleaser release --rm-dist`
+
