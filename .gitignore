@@ -27,6 +27,7 @@ website/node_modules
 website/vendor
 
 /terraform-provider-sys
+/dist/
 
 # Test exclusions
 !command/test-fixtures/**/*.tfstate
