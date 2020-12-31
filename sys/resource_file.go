@@ -50,10 +50,18 @@ func resourceFile() *schema.Resource {
 				ConflictsWith: []string{"content", "sensitive_content", "content_base64"},
 			},
 			"filename": {
-				Type:        schema.TypeString,
-				Description: "Path to the output file",
-				Required:    true,
-				ForceNew:    true,
+				Type:          schema.TypeString,
+				Description:   "Path to the output file",
+				Required:      false,
+				ForceNew:      true,
+				ConflictsWith: []string{"target_directory"},
+			},
+			"target_directory": {
+				Type:          schema.TypeString,
+				Description:   "Target directory path",
+				Required:      false,
+				ForceNew:      true,
+				ConflictsWith: []string{"filename", "content", "sensitive_content", "content_base64"},
 			},
 			"file_permission": {
 				Type:         schema.TypeString,
@@ -158,6 +166,26 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 	return nil
 }
 
+func getDestination(d *schema.ResourceData) (string, bool, error) {
+	var destination = ""
+	var is_directory bool
+
+	if filename, ok := d.GetOk("filename"); !ok {
+		destination = filename.(string)
+		is_directory = false
+	}
+	if target_directory, ok := d.GetOk("target_directory"); ok {
+		destination = target_directory.(string)
+		is_directory = true
+	}
+
+	if destination == "" {
+		return "", false, fmt.Errorf("missing filename or target_directory")
+	}
+
+	return destination, is_directory, nil
+}
+
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	forceOverwrite := d.Get("force_overwrite").(bool)
 	source, sourceSpecified := d.GetOk("source")
@@ -166,7 +194,10 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		return fmt.Errorf("content error, %v", err)
 	}
 
-	destination := d.Get("filename").(string)
+	destination, is_directory, err := getDestination(d)
+	if err != nil {
+		return err
+	}
 
 	destinationDir := path.Dir(destination)
 	if _, err := os.Stat(destinationDir); err != nil {
@@ -184,10 +215,14 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	if sourceSpecified {
 		if !forceOverwrite {
 			if _, err := os.Lstat(destination); err == nil || !os.IsNotExist(err) {
-				return fmt.Errorf("destination file exists at %v", destination)
+				return fmt.Errorf("destination exists at %v", destination)
 			}
 		}
-		err = getter.GetFile(destination, source.(string))
+		if is_directory {
+			err = getter.GetAny(destination, source.(string))
+		} else {
+			err = getter.GetFile(destination, source.(string))
+		}
 		if err != nil {
 			return fmt.Errorf("cannot fetch source %v, %v", source, err)
 		}
@@ -241,9 +276,21 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 }
 
 func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
-	err := os.Remove(d.Get("filename").(string))
+	destination, is_directory, err := getDestination(d)
 	if err != nil {
-		return fmt.Errorf("cannot delete file, %v", err)
+		return err
+	}
+
+	if is_directory {
+		err := os.RemoveAll(destination)
+		if err != nil {
+			return fmt.Errorf("cannot delete target directory, %v", err)
+		}
+	} else {
+		err := os.Remove(destination)
+		if err != nil {
+			return fmt.Errorf("cannot delete file, %v", err)
+		}
 	}
 
 	return nil
