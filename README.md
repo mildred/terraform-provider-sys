@@ -71,4 +71,5 @@ From the [upstream documentation](https://www.terraform.io/docs/registry/provide
 - Cache passphrase with `gpg --armor --detach-sign --local-user $GPG_FINGERPRINT </dev/null`
 - Create tag: `git tag -s -u $GPG_FINGERPRINT vx.x.x`
 - Make release: `goreleaser release --rm-dist`
+- Publish release on GitHub
 

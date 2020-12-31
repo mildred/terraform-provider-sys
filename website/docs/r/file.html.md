@@ -29,7 +29,7 @@ resource "remote_file" "foo" {
 
 The following arguments are supported:
 
-* `conn` - (Required) The connection string.
+* `source` - (Optional) The source file to copy, compatible with go-getter.
 
 * `content` - (Optional) The content of file to create. Conflicts with `sensitive_content` and `content_base64`.
 
@@ -37,10 +37,14 @@ The following arguments are supported:
 
 * `content_base64` - (Optional) The base64 encoded content of the file to create. Use this when dealing with binary data. Conflicts with `content` and `sensitive_content`.
 
-* `filename` - (Required) The path of the file to create.
+* `filename` - (Required or `target_directory` must be present) The path of the file to create.
+
+* `target_directory` - (Required or `filename` must be present) The path of target directory where the file should be put, must not exists unless `force_overwrite` is `true`. Upon resource deletion, the target directory will be entorely removed with no additional check. Can be useful when the source is an archive that go-getter extracts (it will refuse to do so with `filename`).
 
 * `file_permission` - (Optional) The permission to set for the created file. Expects an a string. The default value is `"0777"`.
 
 * `directory_permission` - (Optional) The permission to set for any directories created. Expects a string. The default value is `"0777"`.
+
+* `force_overwrite` - (Optional, default: `false`) When `true`, allows to overwrite target file or directory.
 
 Any required parent directories will be created automatically, and any existing file with the given name will be overwritten.
