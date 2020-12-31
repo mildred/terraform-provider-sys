@@ -52,14 +52,14 @@ func resourceFile() *schema.Resource {
 			"filename": {
 				Type:          schema.TypeString,
 				Description:   "Path to the output file",
-				Required:      false,
+				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"target_directory"},
 			},
 			"target_directory": {
 				Type:          schema.TypeString,
 				Description:   "Target directory path",
-				Required:      false,
+				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"filename", "content", "sensitive_content", "content_base64"},
 			},
