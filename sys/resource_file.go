@@ -316,20 +316,17 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 }
 
 func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
-	destination, is_directory, err := getDestination(d)
-	if err != nil {
-		return err
-	}
-
-	if is_directory {
-		err := os.RemoveAll(destination)
-		if err != nil {
-			return fmt.Errorf("cannot delete target directory, %v", err)
-		}
-	} else {
-		err := os.Remove(destination)
+	if filename := d.Get("filename"); filename != nil {
+		err := os.Remove(filename.(string))
 		if err != nil {
 			return fmt.Errorf("cannot delete file, %v", err)
+		}
+	}
+
+	if target_directory := d.Get("target_directory"); target_directory != nil {
+		err := os.RemoveAll(target_directory.(string))
+		if err != nil {
+			return fmt.Errorf("cannot delete target directory, %v", err)
 		}
 	}
 
