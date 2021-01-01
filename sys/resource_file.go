@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 
 	"github.com/hashicorp/go-getter"
@@ -186,6 +187,39 @@ func getDestination(d *schema.ResourceData) (string, bool, error) {
 	return destination, is_directory, nil
 }
 
+func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
+	var err error
+	if st == nil {
+		st, err = os.Lstat(filename)
+		if err != nil {
+			return err
+		}
+	}
+
+	f, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("cannot open file, %v", err)
+	}
+	defer f.Close()
+
+	if st.IsDir() {
+		files, err := f.Readdir(-1)
+		if err != nil {
+			return err
+		}
+		sort.Slice(files, func(a, b int) bool {
+			return files[a].Name() < files[b].Name()
+		})
+		for _, fst := range files {
+			fmt.Fprintf(w, "%d.%s.%d.", len(fst.Name()), fst.Name(), fst.Size())
+			readFileOrDir(w, path.Join(filename, fst.Name()), fst)
+		}
+	} else {
+		_, err = io.Copy(w, f)
+	}
+	return err
+}
+
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	forceOverwrite := d.Get("force_overwrite").(bool)
 	source, sourceSpecified := d.GetOk("source")
@@ -259,12 +293,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 			return fmt.Errorf("cannot chmod %s, %v", filePerm, err)
 		}
 		h := sha1.New()
-		f, err := os.Open(destination)
-		if err != nil {
-			return fmt.Errorf("cannot open file, %v", err)
-		}
-		defer f.Close()
-		_, err = io.Copy(h, f)
+		err = readFileOrDir(h, destination, nil)
 		if err != nil {
 			return fmt.Errorf("cannot checksum file, %v", err)
 		}
