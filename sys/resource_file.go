@@ -172,7 +172,7 @@ func getDestination(d *schema.ResourceData) (string, bool, error) {
 	var is_directory bool
 	var good bool
 
-	if filename, ok := d.GetOk("filename"); !ok {
+	if filename, ok := d.GetOk("filename"); ok {
 		destination = filename.(string)
 		is_directory = false
 		good = true
