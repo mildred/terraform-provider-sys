@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -104,12 +105,19 @@ type resourceFileSystemd struct {
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// If the output file doesn't exist, mark the resource for creation.
 	var outputPath string
+	var isFile, isDir bool
 
 	if filename := d.Get("filename"); filename != nil {
 		outputPath = filename.(string)
+		isFile = true
 	}
 	if target_directory := d.Get("target_directory"); target_directory != nil {
 		outputPath = target_directory.(string)
+		isDir = true
+	}
+
+	if !isFile && !isDir {
+		return fmt.Errorf("missing filename or target_directory")
 	}
 
 	st, err := os.Stat(outputPath)
@@ -129,13 +137,26 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// Verify that the content of the destination file matches the content we
 	// expect. Otherwise, the file might have been modified externally and we
 	// must reconcile.
-	sum, err := checksumFile(outputPath)
-	if err != nil {
-		return fmt.Errorf("Cannot checksum, %v", err)
-	}
+	if isFile {
+		outputContent, err := ioutil.ReadFile(outputPath)
+		if err != nil {
+			return fmt.Errorf("Cannot read file, %v", err)
+		}
 
-	if sum != d.Id() {
-		d.SetId("")
+		outputChecksum := sha1.Sum([]byte(outputContent))
+		if hex.EncodeToString(outputChecksum[:]) != d.Id() {
+			d.SetId("")
+			return nil
+		}
+	} else {
+		sum, err := checksumFile(outputPath)
+		if err != nil {
+			return fmt.Errorf("Cannot checksum, %v", err)
+		}
+
+		if sum != d.Id() {
+			d.SetId("")
+		}
 	}
 
 	return nil
