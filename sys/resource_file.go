@@ -170,20 +170,20 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 func getDestination(d *schema.ResourceData) (string, bool, error) {
 	var destination = ""
 	var is_directory bool
-	var ok bool
+	var good bool
 
 	if filename, ok := d.GetOk("filename"); !ok {
 		destination = filename.(string)
 		is_directory = false
-		ok = true
+		good = true
 	}
 	if target_directory, ok := d.GetOk("target_directory"); ok {
 		destination = target_directory.(string)
 		is_directory = true
-		ok = true
+		good = true
 	}
 
-	if !ok {
+	if !good {
 		return "", false, fmt.Errorf("missing filename or target_directory")
 	}
 
