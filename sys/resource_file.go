@@ -170,17 +170,20 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 func getDestination(d *schema.ResourceData) (string, bool, error) {
 	var destination = ""
 	var is_directory bool
+	var ok bool
 
 	if filename, ok := d.GetOk("filename"); !ok {
 		destination = filename.(string)
 		is_directory = false
+		ok = true
 	}
 	if target_directory, ok := d.GetOk("target_directory"); ok {
 		destination = target_directory.(string)
 		is_directory = true
+		ok = true
 	}
 
-	if destination == "" {
+	if !ok {
 		return "", false, fmt.Errorf("missing filename or target_directory")
 	}
 
@@ -218,6 +221,16 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 		_, err = io.Copy(w, f)
 	}
 	return err
+}
+
+func checksumFile(destination string) (string, error) {
+	h := sha1.New()
+	err := readFileOrDir(h, destination, nil)
+	if err != nil {
+		return "", err
+	}
+	checksum := h.Sum(nil)
+	return hex.EncodeToString(checksum[:]), nil
 }
 
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
@@ -292,13 +305,11 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		if err != nil {
 			return fmt.Errorf("cannot chmod %s, %v", filePerm, err)
 		}
-		h := sha1.New()
-		err = readFileOrDir(h, destination, nil)
+		id, err := checksumFile(destination)
 		if err != nil {
 			return fmt.Errorf("cannot checksum file, %v", err)
 		}
-		checksum := h.Sum(nil)
-		d.SetId(hex.EncodeToString(checksum[:]))
+		d.SetId(id)
 	}
 
 	return nil

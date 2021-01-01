@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -20,7 +21,7 @@ func resourceShellScript() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			"working_directory": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
 				ForceNew: true,
 			},
 			"shell": {
@@ -31,17 +32,22 @@ func resourceShellScript() *schema.Resource {
 			},
 			"create": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
 				ForceNew: true,
 			},
 			"read": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
 				ForceNew: true,
 			},
 			"delete": {
 				Type:     schema.TypeString,
-				Required: true,
+				Optional: true,
+				ForceNew: true,
+			},
+			"filename": {
+				Type:     schema.TypeString,
+				Optional: true,
 				ForceNew: true,
 			},
 		},
@@ -57,23 +63,58 @@ func (err *ExitError) Error() string {
 }
 
 func resourceShellScriptRead(d *schema.ResourceData, _ interface{}) error {
-	script := d.Get("read").(string)
-	id, err := resourceShellScriptRun(d, script)
-	d.SetId(id)
-	return err
+	script, ok := d.GetOk("read")
+	if ok {
+		id, err := resourceShellScriptRun(d, script.(string))
+		d.SetId(id)
+		return err
+	} else if filename, ok := d.GetOk("filename"); ok {
+		id, err := checksumFile(filename.(string))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("cannot checksum file, %v", err)
+		}
+		d.SetId(id)
+	}
+	return nil
 }
 
 func resourceShellScriptCreate(d *schema.ResourceData, _ interface{}) error {
-	script := d.Get("create").(string)
-	id, err := resourceShellScriptRun(d, script)
-	d.SetId(id)
-	return err
+	script, ok := d.GetOk("create")
+	filename, okf := d.GetOk("filename")
+	_, okr := d.GetOk("read")
+	if ok && okr {
+		id, err := resourceShellScriptRun(d, script.(string))
+		d.SetId(id)
+		return err
+	} else if ok && okf {
+		_, err := resourceShellScriptRun(d, script.(string))
+		if err != nil {
+			return err
+		}
+		id, err := checksumFile(filename.(string))
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("cannot checksum file, %v", err)
+		}
+		d.SetId(id)
+	} else if ok {
+		_, err := resourceShellScriptRun(d, script.(string))
+		d.SetId("1")
+		return err
+	} else {
+		d.SetId("1")
+	}
+	return nil
 }
 
 func resourceShellScriptDelete(d *schema.ResourceData, _ interface{}) error {
-	script := d.Get("delete").(string)
-	_, err := resourceShellScriptRun(d, script)
-	return err
+	script, ok := d.GetOk("delete")
+	if ok {
+		_, err := resourceShellScriptRun(d, script.(string))
+		return err
+	} else if filename, ok := d.GetOk("filename"); ok {
+		return os.RemoveAll(filename.(string))
+	}
+	return nil
 }
 
 func resourceShellScriptRun(d *schema.ResourceData, script string) (string, error) {
