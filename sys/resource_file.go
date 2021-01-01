@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -104,7 +103,15 @@ type resourceFileSystemd struct {
 
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// If the output file doesn't exist, mark the resource for creation.
-	outputPath := d.Get("filename").(string)
+	var outputPath string
+
+	if filename := d.Get("filename"); filename != nil {
+		outputPath = filename.(string)
+	}
+	if target_directory := d.Get("target_directory"); target_directory != nil {
+		outputPath = target_directory.(string)
+	}
+
 	st, err := os.Stat(outputPath)
 	if os.IsNotExist(err) {
 		d.SetId("")
@@ -122,15 +129,13 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// Verify that the content of the destination file matches the content we
 	// expect. Otherwise, the file might have been modified externally and we
 	// must reconcile.
-	outputContent, err := ioutil.ReadFile(outputPath)
+	sum, err := checksumFile(outputPath)
 	if err != nil {
-		return fmt.Errorf("Cannot read file, %v", err)
+		return fmt.Errorf("Cannot checksum, %v", err)
 	}
 
-	outputChecksum := sha1.Sum([]byte(outputContent))
-	if hex.EncodeToString(outputChecksum[:]) != d.Id() {
+	if sum != d.Id() {
 		d.SetId("")
-		return nil
 	}
 
 	return nil
