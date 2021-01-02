@@ -105,18 +105,14 @@ type resourceFileSystemd struct {
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// If the output file doesn't exist, mark the resource for creation.
 	var outputPath string
-	var isFile, isDir bool
+	var isFile bool
 
 	if filename := d.Get("filename"); filename != nil {
 		outputPath = filename.(string)
 		isFile = true
-	}
-	if target_directory := d.Get("target_directory"); target_directory != nil {
+	} else if target_directory := d.Get("target_directory"); target_directory != nil {
 		outputPath = target_directory.(string)
-		isDir = true
-	}
-
-	if !isFile && !isDir {
+	} else {
 		return fmt.Errorf("missing filename or target_directory")
 	}
 
