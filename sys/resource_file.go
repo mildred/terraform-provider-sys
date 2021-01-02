@@ -103,19 +103,12 @@ type resourceFileSystemd struct {
 }
 
 func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
-	// If the output file doesn't exist, mark the resource for creation.
-	var outputPath string
-	var isFile bool
-
-	if filename := d.Get("filename"); filename != nil {
-		outputPath = filename.(string)
-		isFile = true
-	} else if target_directory := d.Get("target_directory"); target_directory != nil {
-		outputPath = target_directory.(string)
-	} else {
-		return fmt.Errorf("missing filename or target_directory")
+	outputPath, isDir, err := getDestination(d)
+	if err != nil {
+		return err
 	}
 
+	// If the output file doesn't exist, mark the resource for creation.
 	st, err := os.Stat(outputPath)
 	if os.IsNotExist(err) {
 		d.SetId("")
@@ -133,7 +126,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	// Verify that the content of the destination file matches the content we
 	// expect. Otherwise, the file might have been modified externally and we
 	// must reconcile.
-	if isFile {
+	if !isDir {
 		outputContent, err := ioutil.ReadFile(outputPath)
 		if err != nil {
 			return fmt.Errorf("Cannot read file, %v", err)
