@@ -149,10 +149,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 		if err != nil {
 			return fmt.Errorf("Cannot checksum, %v", err)
 		}
-
-		if sum != d.Id() {
-			d.SetId("")
-		}
+		d.SetId(sum)
 	}
 
 	return nil
