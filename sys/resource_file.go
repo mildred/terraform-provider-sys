@@ -328,15 +328,15 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 }
 
 func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
-	if filename := d.Get("filename"); filename != nil {
-		err := os.Remove(filename.(string))
+	if filename := d.Get("filename").(string); filename != "" {
+		err := os.Remove(filename)
 		if err != nil {
 			return fmt.Errorf("cannot delete file, %v", err)
 		}
 	}
 
-	if target_directory := d.Get("target_directory"); target_directory != nil {
-		err := os.RemoveAll(target_directory.(string))
+	if target_directory := d.Get("target_directory").(string); target_directory != "" {
+		err := os.RemoveAll(target_directory)
 		if err != nil {
 			return fmt.Errorf("cannot delete target directory, %v", err)
 		}
