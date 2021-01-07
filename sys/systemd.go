@@ -68,31 +68,15 @@ func systemdIsEnabled(unit string) (bool, error) {
 	return true, nil
 }
 
-func systemdUpdnStartEnable(log hclog.Logger, unit string, up, start, enable bool) error {
+func systemdCommand(log hclog.Logger, unit string, action string, now bool) error {
 	stderr := new(bytes.Buffer)
 	var cmd *exec.Cmd
-	if up {
-		if enable && start {
-			log.Trace("systemctl enable --now %s", unit)
-			cmd = exec.Command("systemctl", "enable", "--now", unit)
-		} else if enable {
-			log.Trace("systemctl enable %s", unit)
-			cmd = exec.Command("systemctl", "enable", unit)
-		} else if start {
-			log.Trace("systemctl start %s", unit)
-			cmd = exec.Command("systemctl", "start", unit)
-		}
+	if now {
+		log.Trace("systemctl %s --now %s", action, unit)
+		cmd = exec.Command("systemctl", action, "--now", unit)
 	} else {
-		if enable && start {
-			log.Trace("systemctl disable --now %s", unit)
-			cmd = exec.Command("systemctl", "disable", "--now", unit)
-		} else if enable {
-			log.Trace("systemctl disable %s", unit)
-			cmd = exec.Command("systemctl", "disable", unit)
-		} else if start {
-			log.Trace("systemctl stop %s", unit)
-			cmd = exec.Command("systemctl", "stop", unit)
-		}
+		log.Trace("systemctl %s %s", action, unit)
+		cmd = exec.Command("systemctl", action, unit)
 	}
 	cmd.Stderr = stderr
 	err := cmd.Run()
@@ -102,35 +86,51 @@ func systemdUpdnStartEnable(log hclog.Logger, unit string, up, start, enable boo
 	return nil
 }
 
+func systemdEnable(log hclog.Logger, unit string, now bool) error {
+	return systemdCommand(log, unit, "enable", now)
+}
+
+func systemdDisable(log hclog.Logger, unit string, now bool) error {
+	return systemdCommand(log, unit, "disable", now)
+}
+
+func systemdStart(log hclog.Logger, unit string) error {
+	return systemdCommand(log, unit, "start", false)
+}
+
+func systemdStop(log hclog.Logger, unit string) error {
+	return systemdCommand(log, unit, "stop", false)
+}
 func systemdStartStopEnableDisable(log hclog.Logger, unit string, start, stop, enable, disable bool) error {
 	if (start && stop) || (enable && disable) {
 		return fmt.Errorf("Internal error, requesting conflicting orders start=%b stop=%b enable=%b disable=%b", start, stop, enable, disable)
 	}
 
-	if enable && start {
-		return systemdUpdnStartEnable(log, unit, true, true, true)
-	} else if enable && stop {
-		err := systemdUpdnStartEnable(log, unit, true, false, true)
+	if start && enable {
+		return systemdEnable(log, unit, true)
+	} else if start && disable {
+		err := systemdDisable(log, unit, false)
 		if err != nil {
 			return err
 		}
-		return systemdUpdnStartEnable(log, unit, false, true, false)
-	} else if enable {
-		return systemdUpdnStartEnable(log, unit, true, true, true)
-	} else if disable && stop {
-		return systemdUpdnStartEnable(log, unit, false, true, true)
-	} else if disable && start {
-		err := systemdUpdnStartEnable(log, unit, false, false, true)
-		if err != nil {
-			return err
-		}
-		return systemdUpdnStartEnable(log, unit, true, true, false)
-	} else if disable {
-		return systemdUpdnStartEnable(log, unit, false, false, true)
+		return systemdStart(log, unit)
 	} else if start {
-		return systemdUpdnStartEnable(log, unit, true, true, false)
+		return systemdStart(log, unit)
+	} else if stop && enable {
+		err := systemdEnable(log, unit, false)
+		if err != nil {
+			return err
+		}
+		return systemdStop(log, unit)
+	} else if stop && disable {
+		return systemdDisable(log, unit, true)
 	} else if stop {
-		return systemdUpdnStartEnable(log, unit, false, true, false)
+		return systemdStop(log, unit)
+	} else if enable {
+		return systemdEnable(log, unit, false)
+	} else if disable {
+		return systemdDisable(log, unit, false)
 	}
 	return nil
 }
+
