@@ -25,34 +25,19 @@ func resourceSystemdUnit() *schema.Resource {
 				ForceNew: true,
 			},
 			"enable": {
-				Type:          schema.TypeBool,
-				Description:   "Enable the unit",
-				Optional:      true,
-				ConflictsWith: []string{"disable"},
-			},
-			"disable": {
-				Type:          schema.TypeBool,
-				Description:   "Disable the unit",
-				Optional:      true,
-				ConflictsWith: []string{"enable"},
+				Type:        schema.TypeBool,
+				Description: "Enable the unit",
+				Optional:    true,
 			},
 			"start": {
-				Type:          schema.TypeBool,
-				Description:   "Start the unit",
-				Optional:      true,
-				ConflictsWith: []string{"stop"},
-			},
-			"stop": {
-				Type:          schema.TypeBool,
-				Description:   "Stop the unit",
-				Optional:      true,
-				ConflictsWith: []string{"start"},
+				Type:        schema.TypeBool,
+				Description: "Start the unit",
+				Optional:    true,
 			},
 			"restart_on": {
 				Type:        schema.TypeMap,
 				Description: "Restart unit if this changes",
 				Optional:    true,
-				ForceNew:    true,
 			},
 			"rollback": {
 				Type:        schema.TypeMap,
@@ -97,14 +82,6 @@ func resourceSystemdUnit() *schema.Resource {
 			},
 			"job_type": {
 				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"enabled": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"active": {
-				Type:     schema.TypeBool,
 				Computed: true,
 			},
 		},
@@ -243,29 +220,13 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 		}
 
 		enabled := sdIsEnabled(unitFileState)
-		active := sdIsActive(status.LoadState)
+		active := sdIsActive(status.ActiveState)
 		rollback["active"] = strconv.FormatBool(active)
 		rollback["enabled"] = strconv.FormatBool(enabled)
 		rollback["unit_file_state"] = unitFileState
 
-		d.Set("enabled", enabled)
-		d.Set("active", active)
-
-		if active {
-			d.Set("stop", !active)
-			d.Set("start", active)
-		} else {
-			d.Set("start", active)
-			d.Set("stop", !active)
-		}
-
-		if enabled {
-			d.Set("disable", !enabled)
-			d.Set("enable", enabled)
-		} else {
-			d.Set("enable", enabled)
-			d.Set("disable", !enabled)
-		}
+		d.Set("start", active)
+		d.Set("enable", enabled)
 	}
 
 	if _, ok := d.GetOk("rollback"); !ok {
@@ -327,7 +288,10 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.Errorf("cannot %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
 	}
-	err = resourceSystemdActivate(ctx, d, sd, rollback_active)
+
+	restart := d.HasChange("restart_on")
+
+	err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
 	if err != nil {
 		return diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
 	}
@@ -358,7 +322,7 @@ func resourceSystemdEnable(ctx context.Context, d *schema.ResourceData, sd *syst
 	return err
 }
 
-func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, activate bool) error {
+func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, activate, restart bool) error {
 	unit := d.Get("name").(string)
 	statuses, err := sd.ListUnitsByNamesContext(ctx, []string{unit})
 	if err != nil || len(statuses) < 1 {
@@ -370,7 +334,9 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 
 	complete := make(chan string)
 
-	if !is_active && activate {
+	if restart && activate {
+		_, err = sd.RestartUnitContext(ctx, unit, "replace", complete)
+	} else if !is_active && activate {
 		_, err = sd.StartUnitContext(ctx, unit, "replace", complete)
 	} else if is_active && !activate {
 		_, err = sd.StopUnitContext(ctx, unit, "replace", complete)
@@ -400,10 +366,8 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 	defer sd.Close()
 
 	unit := d.Get("name").(string)
-	start := d.Get("start").(bool)
-	stop := d.Get("stop").(bool)
-	enable := d.Get("enable").(bool)
-	disable := d.Get("disable").(bool)
+	start, has_start := d.GetOkExists("start")
+	enable, has_enable := d.GetOkExists("enable")
 
 	rollback := d.Get("rollback").(map[string]interface{})
 	rollback_active := parseBoolDef(rollback["active"], false)
@@ -414,35 +378,27 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	if enable {
-		err = resourceSystemdEnable(ctx, d, sd, true)
+	if enable != nil && d.HasChange("enable") {
+		err = resourceSystemdEnable(ctx, d, sd, enable.(bool))
 		if err != nil {
-			return diag.Errorf("cannot enable unit %s: %v", unit, err)
+			return diag.Errorf("cannot %s unit %s: %v", sdEnableString(enable.(bool)), unit, err)
 		}
-	} else if disable {
-		err = resourceSystemdEnable(ctx, d, sd, false)
-		if err != nil {
-			return diag.Errorf("cannot disable unit %s: %v", unit, err)
-		}
-	} else {
+	} else if !has_enable || enable == nil {
 		err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 		if err != nil {
 			return diag.Errorf("cannot rollback %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
 		}
 	}
 
-	if start {
-		err = resourceSystemdActivate(ctx, d, sd, true)
+	restart := d.HasChange("restart_on")
+
+	if start != nil && d.HasChange("start") {
+		err = resourceSystemdActivate(ctx, d, sd, start.(bool), restart)
 		if err != nil {
-			return diag.Errorf("cannot start unit %s: %v", unit, err)
+			return diag.Errorf("cannot start unit %s: %v", sdStartString(start.(bool)), unit, err)
 		}
-	} else if stop {
-		err = resourceSystemdActivate(ctx, d, sd, false)
-		if err != nil {
-			return diag.Errorf("cannot stop unit %s: %v", unit, err)
-		}
-	} else {
-		err = resourceSystemdActivate(ctx, d, sd, rollback_active)
+	} else if !has_start || start == nil {
+		err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
 		if err != nil {
 			return diag.Errorf("cannot rollback %s unit %s: %v", sdStartString(rollback_active), unit, err)
 		}

@@ -73,3 +73,35 @@ From the [upstream documentation](https://www.terraform.io/docs/registry/provide
 - Make release: `goreleaser release --rm-dist`
 - ~Publish release on GitHub~
 
+Test out the provider before making the release
+-----------------------------------------------
+
+See https://www.terraform.io/docs/extend/how-terraform-works.html and https://www.terraform.io/docs/cli/config/config-file.html#development-overrides-for-provider-developers
+
+First, build the provider:
+
+    CGO_ENABLED=0 go build -o terraform-provider-sys .
+
+If necessary, deploy the provider to a remote host
+
+    rsync --rsh=ssh --info=progress2 terraform-provider-sys user@host:/tmp/terraform-provider-sys
+
+Place this snippet first in `~/.terraformrc`:
+
+    provider_installation {
+
+      # Use /home/developer/tmp/terraform-null as an overridden package directory
+      # for the hashicorp/null provider. This disables the version and checksum
+      # verifications for this provider and forces Terraform to look for the
+      # null provider plugin in the given directory.
+      dev_overrides {
+        # The directory should contain a terraform-provider-sys executable
+        "mildred/sys" = "/path/to/provider/dir/"
+      }
+
+      # For all other providers, install them directly from their origin provider
+      # registries as normal. If you omit this, Terraform will _only_ use
+      # the dev_overrides block, and so no other providers will be available.
+      direct {}
+    }
+
