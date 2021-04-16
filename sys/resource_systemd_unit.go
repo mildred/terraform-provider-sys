@@ -99,6 +99,14 @@ func resourceSystemdUnit() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"enabled": {
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
+			"active": {
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
 		},
 	}
 }
@@ -240,6 +248,9 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 		rollback["enabled"] = strconv.FormatBool(enabled)
 		rollback["unit_file_state"] = unitFileState
 
+		d.Set("enabled", enabled)
+		d.Set("active", active)
+
 		if active {
 			d.Set("stop", !active)
 			d.Set("start", active)
@@ -368,9 +379,13 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 		return err
 	}
 
-	completeStatus := <-complete
-	if completeStatus != "done" {
-		return fmt.Errorf("Failed to activate %s: %s", unit, completeStatus)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case completeStatus := <-complete:
+		if completeStatus != "done" {
+			return fmt.Errorf("Failed to activate %s: %s", unit, completeStatus)
+		}
 	}
 
 	return err
