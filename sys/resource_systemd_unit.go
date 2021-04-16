@@ -378,7 +378,7 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	if enable != nil && d.HasChange("enable") {
+	if enable != nil && has_enable && d.HasChange("enable") {
 		err = resourceSystemdEnable(ctx, d, sd, enable.(bool))
 		if err != nil {
 			return diag.Errorf("cannot %s unit %s: %v", sdEnableString(enable.(bool)), unit, err)
@@ -392,7 +392,7 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 
 	restart := d.HasChange("restart_on")
 
-	if start != nil && d.HasChange("start") {
+	if start != nil && has_start && (d.HasChange("start") || restart) {
 		err = resourceSystemdActivate(ctx, d, sd, start.(bool), restart)
 		if err != nil {
 			return diag.Errorf("cannot start unit %s: %v", sdStartString(start.(bool)), unit, err)
