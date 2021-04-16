@@ -3,7 +3,6 @@ package sys
 import (
 	"context"
 
-	systemd "github.com/coreos/go-systemd/v22/dbus"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -35,10 +34,8 @@ func Provider() *schema.Provider {
 }
 
 type providerConfiguration struct {
-	debUpdated    bool
-	Logger        hclog.Logger
-	SystemdSystem *systemd.Conn
-	SystemdUser   *systemd.Conn
+	debUpdated bool
+	Logger     hclog.Logger
 }
 
 func providerConfigure(ctx context.Context, data *schema.ResourceData) (interface{}, diag.Diagnostics) {

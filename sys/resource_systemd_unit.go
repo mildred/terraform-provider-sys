@@ -171,25 +171,11 @@ func sdIsEnabled(unit_file_state string) bool {
 }
 
 func sdUser(ctx context.Context, m *providerConfiguration) (*systemd.Conn, error) {
-	var err error
-	if m.SystemdUser == nil {
-		m.SystemdUser, err = systemd.NewUserConnectionContext(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return m.SystemdUser, nil
+	return systemd.NewUserConnectionContext(ctx)
 }
 
 func sdSystem(ctx context.Context, m *providerConfiguration) (*systemd.Conn, error) {
-	var err error
-	if m.SystemdSystem == nil {
-		m.SystemdSystem, err = systemd.NewSystemConnectionContext(ctx)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return m.SystemdSystem, nil
+	return systemd.NewSystemConnectionContext(ctx)
 }
 
 func sdConn(ctx context.Context, d *schema.ResourceData, m interface{}) (*systemd.Conn, error) {
@@ -206,6 +192,8 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
 	}
+
+	defer sd.Close()
 
 	var errs diag.Diagnostics
 	unit := d.Get("name").(string)
@@ -283,6 +271,8 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.Errorf("cannot connect to systemd: %v", err)
 	}
 
+	defer sd.Close()
+
 	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
@@ -301,6 +291,8 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
 	}
+
+	defer sd.Close()
 
 	unit := d.Get("name").(string)
 
@@ -387,6 +379,8 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
 	}
+
+	defer sd.Close()
 
 	unit := d.Get("name").(string)
 	start := d.Get("start").(bool)
