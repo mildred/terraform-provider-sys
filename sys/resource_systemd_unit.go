@@ -2,7 +2,10 @@ package sys
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+
+	systemd "github.com/coreos/go-systemd/v22/dbus"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -56,59 +59,211 @@ func resourceSystemdUnit() *schema.Resource {
 				Description: "Rollback information to restore once the unit is destroyed",
 				Computed:    true,
 			},
+			"system": {
+				Type:          schema.TypeBool,
+				Description:   "System systemd socket",
+				Optional:      true,
+				ConflictsWith: []string{"user"},
+			},
+			"user": {
+				Type:          schema.TypeBool,
+				Description:   "User systemd socket",
+				Optional:      true,
+				ConflictsWith: []string{"system"},
+			},
+			"description": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"load_state": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"active_state": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"sub_state": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"followed": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"job_id": {
+				Type:     schema.TypeInt,
+				Computed: true,
+			},
+			"job_type": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 		},
 	}
 }
 
+const (
+	// Unit File State
+	systemdEnabled        = "enabled"
+	systemdEnabledRuntime = "enabled-runtime"
+	systemdLinked         = "linked"
+	systemdLinkedRuntime  = "linked-runtime"
+	systemdMasked         = "masked"
+	systemdMaskedRuntime  = "masked-runtime"
+	systemdStatic         = "static"
+	systemdDisabled       = "disabled"
+	systemdInvalid        = "invalid"
+	systemdAlias          = "alias"     // not in doc
+	systemdIndirect       = "indirect"  // not in doc
+	systemdGenerated      = "generated" // not in doc
+
+	// Load State
+	systemdLoaded = "loaded"
+	systemdError  = "error"
+	//systemdMasked   = "masked"
+	systemdNotFound = "not-found"
+
+	// Active State
+	systemdActive       = "active"
+	systemdReloading    = "reloading"
+	systemdInactive     = "inactive"
+	systemdFailed       = "failed"
+	systemdActivating   = "activating"
+	systemdDeactivating = "deactivating"
+
+	// Sub State (not exhaustive)
+	systemdDead    = "dead"
+	systemdRunning = "running"
+)
+
+func sdIsActive(active_state string) bool {
+	return active_state == systemdActive || active_state == systemdReloading
+}
+
+func sdIsFailed(active_state string) bool {
+	return active_state == systemdFailed
+}
+
+func sdEnableString(enable bool) string {
+	if enable {
+		return "enable"
+	} else {
+		return "disable"
+	}
+}
+
+func sdStartString(start bool) string {
+	if start {
+		return "start"
+	} else {
+		return "stop"
+	}
+}
+
+func sdIsEnabled(unit_file_state string) bool {
+	switch unit_file_state {
+	case systemdEnabled, systemdEnabledRuntime, systemdStatic, systemdAlias, systemdIndirect, systemdGenerated:
+		return true
+	default:
+		return false
+	}
+}
+
+func sdUser(ctx context.Context, m *providerConfiguration) (*systemd.Conn, error) {
+	var err error
+	if m.SystemdUser == nil {
+		m.SystemdUser, err = systemd.NewUserConnectionContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return m.SystemdUser, nil
+}
+
+func sdSystem(ctx context.Context, m *providerConfiguration) (*systemd.Conn, error) {
+	var err error
+	if m.SystemdSystem == nil {
+		m.SystemdSystem, err = systemd.NewSystemConnectionContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return m.SystemdSystem, nil
+}
+
+func sdConn(ctx context.Context, d *schema.ResourceData, m interface{}) (*systemd.Conn, error) {
+	user := d.Get("user").(bool)
+	if user {
+		return sdUser(ctx, m.(*providerConfiguration))
+	} else {
+		return sdSystem(ctx, m.(*providerConfiguration))
+	}
+}
+
 func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	log := m.(*providerConfiguration).Logger
+	sd, err := sdConn(ctx, d, m)
+	if err != nil {
+		return diag.Errorf("cannot connect to systemd: %v", err)
+	}
+
 	var errs diag.Diagnostics
 	unit := d.Get("name").(string)
 
-	err := systemdDaemonReload(log)
+	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	exists, err := systemdIsExists(unit)
-	if err != nil {
-		errs = append(errs, diag.Errorf("error checking if unit exists: %v", err)...)
-	} else if exists {
-		d.SetId(unit)
-	} else {
-		d.SetId("")
+	statuses, err := sd.ListUnitsByNamesContext(ctx, []string{unit})
+	if err != nil || len(statuses) < 1 {
+		return diag.Errorf("cannot query unit %s: %v", unit, err)
 	}
+	status := statuses[0]
+
+	d.Set("description", status.Description)
+	d.Set("load_state", status.LoadState)
+	d.Set("active_state", status.ActiveState)
+	d.Set("sub_state", status.SubState)
+	d.Set("followed", status.Followed)
+	d.Set("job_id", status.JobId)
+	d.Set("job_type", status.JobType)
 
 	var rollback = map[string]interface{}{
-		"exists": strconv.FormatBool(exists),
+		"exists":       strconv.FormatBool(status.LoadState != systemdNotFound),
+		"load_state":   status.LoadState,
+		"active_state": status.ActiveState,
+		"sub_state":    status.SubState,
 	}
 
-	if exists {
+	if status.LoadState == systemdNotFound {
+		d.SetId("")
+	} else {
+		d.SetId(status.Name)
 
-		active, err := systemdIsActive(unit)
+		unitFileState, err := sd.GetUnitFileStateContext(ctx, status.Name)
 		if err != nil {
-			errs = append(errs, diag.Errorf("error running systemd is-active: %v", err)...)
-		} else {
-			if _, ok := d.GetOk("start"); ok {
-				d.Set("start", active)
-			}
-			if _, ok := d.GetOk("stop"); ok {
-				d.Set("stop", !active)
-			}
-			rollback["active"] = strconv.FormatBool(active)
+			return diag.Errorf("cannot get unit file state for %s: %v", status.Name, err)
 		}
 
-		enabled, err := systemdIsEnabled(unit)
-		if err != nil {
-			errs = append(errs, diag.Errorf("error running systemd is-enabled: %v", err)...)
-		} else {
-			if _, ok := d.GetOk("enable"); ok {
-				d.Set("enable", enabled)
-			}
-			if _, ok := d.GetOk("disable"); ok {
-				d.Set("disable", !enabled)
-			}
-			rollback["enabled"] = strconv.FormatBool(enabled)
+		enabled := sdIsEnabled(unitFileState)
+		active := sdIsActive(status.LoadState)
+		rollback["active"] = strconv.FormatBool(active)
+		rollback["enabled"] = strconv.FormatBool(enabled)
+		rollback["unit_file_state"] = unitFileState
+
+		if _, ok := d.GetOk("start"); ok {
+			d.Set("start", active)
+		}
+		if _, ok := d.GetOk("stop"); ok {
+			d.Set("stop", !active)
+		}
+
+		if _, ok := d.GetOk("enable"); ok {
+			d.Set("enable", enabled)
+		}
+		if _, ok := d.GetOk("disable"); ok {
+			d.Set("disable", !enabled)
 		}
 	}
 
@@ -123,8 +278,12 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 }
 
 func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	log := m.(*providerConfiguration).Logger
-	err := systemdDaemonReload(log)
+	sd, err := sdConn(ctx, d, m)
+	if err != nil {
+		return diag.Errorf("cannot connect to systemd: %v", err)
+	}
+
+	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
@@ -138,21 +297,34 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 }
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	log := m.(*providerConfiguration).Logger
+	sd, err := sdConn(ctx, d, m)
+	if err != nil {
+		return diag.Errorf("cannot connect to systemd: %v", err)
+	}
+
 	unit := d.Get("name").(string)
 
 	rollback := d.Get("rollback").(map[string]interface{})
-	rollback_start := parseBoolDef(rollback["active"], false)
+	rollback_active := parseBoolDef(rollback["active"], false)
 	rollback_enable := parseBoolDef(rollback["enabled"], false)
 
-	err := systemdDaemonReload(log)
+	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	err = systemdStartStopEnableDisable(log, unit, rollback_start, !rollback_start, rollback_enable, !rollback_enable)
+	// If unknown by systemd, there is nothing to rollback
+	if d.Id() == "" {
+		return nil
+	}
+
+	err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 	if err != nil {
-		return diag.Errorf("cannot delete: %v", err)
+		return diag.Errorf("cannot %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+	}
+	err = resourceSystemdActivate(ctx, d, sd, rollback_active)
+	if err != nil {
+		return diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
 	}
 
 	errs := resourceSystemdUnitRead(ctx, d, m)
@@ -163,8 +335,59 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	return nil
 }
 
+func resourceSystemdEnable(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, enable bool) error {
+	unit := d.Get("name").(string)
+	unitFileState, err := sd.GetUnitFileStateContext(ctx, unit)
+	if err != nil {
+		return fmt.Errorf("cannot get unit file state for %s: %v", unit, err)
+	}
+
+	is_enabled := sdIsEnabled(unitFileState)
+
+	if !is_enabled && enable {
+		_, _, err = sd.EnableUnitFilesContext(ctx, []string{unit}, false, true)
+	} else if is_enabled && !enable {
+		_, err = sd.DisableUnitFilesContext(ctx, []string{unit}, false)
+	}
+
+	return err
+}
+
+func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, activate bool) error {
+	unit := d.Get("name").(string)
+	statuses, err := sd.ListUnitsByNamesContext(ctx, []string{unit})
+	if err != nil || len(statuses) < 1 {
+		return fmt.Errorf("cannot query unit %s: %v", unit, err)
+	}
+	status := statuses[0]
+
+	is_active := sdIsActive(status.LoadState)
+
+	complete := make(chan string)
+
+	if !is_active && activate {
+		_, err = sd.StartUnitContext(ctx, unit, "replace", complete)
+	} else if is_active && !activate {
+		_, err = sd.StopUnitContext(ctx, unit, "replace", complete)
+	}
+	if err != nil {
+		return err
+	}
+
+	completeStatus := <-complete
+	if completeStatus != "done" {
+		return fmt.Errorf("Failed to activate %s: %s", unit, completeStatus)
+	}
+
+	return err
+}
+
 func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	log := m.(*providerConfiguration).Logger
+	sd, err := sdConn(ctx, d, m)
+	if err != nil {
+		return diag.Errorf("cannot connect to systemd: %v", err)
+	}
+
 	unit := d.Get("name").(string)
 	start := d.Get("start").(bool)
 	stop := d.Get("stop").(bool)
@@ -172,27 +395,46 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 	disable := d.Get("disable").(bool)
 
 	rollback := d.Get("rollback").(map[string]interface{})
-	rollback_start := parseBoolDef(rollback["active"], false)
+	rollback_active := parseBoolDef(rollback["active"], false)
 	rollback_enable := parseBoolDef(rollback["enabled"], false)
 
-	if !start && !stop {
-		start = rollback_start
-		stop = !rollback_start
-	}
-
-	if !enable && !disable {
-		enable = rollback_enable
-		disable = !rollback_enable
-	}
-
-	err := systemdDaemonReload(log)
+	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	err = systemdStartStopEnableDisable(log, unit, start, stop, enable, disable)
-	if err != nil {
-		return diag.Errorf("cannot start/enable unit: %v", err)
+	if enable {
+		err = resourceSystemdEnable(ctx, d, sd, true)
+		if err != nil {
+			return diag.Errorf("cannot enable unit %s: %v", unit, err)
+		}
+	} else if disable {
+		err = resourceSystemdEnable(ctx, d, sd, false)
+		if err != nil {
+			return diag.Errorf("cannot disable unit %s: %v", unit, err)
+		}
+	} else {
+		err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
+		if err != nil {
+			return diag.Errorf("cannot rollback %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+		}
+	}
+
+	if start {
+		err = resourceSystemdActivate(ctx, d, sd, true)
+		if err != nil {
+			return diag.Errorf("cannot start unit %s: %v", unit, err)
+		}
+	} else if stop {
+		err = resourceSystemdActivate(ctx, d, sd, false)
+		if err != nil {
+			return diag.Errorf("cannot stop unit %s: %v", unit, err)
+		}
+	} else {
+		err = resourceSystemdActivate(ctx, d, sd, rollback_active)
+		if err != nil {
+			return diag.Errorf("cannot rollback %s unit %s: %v", sdStartString(rollback_active), unit, err)
+		}
 	}
 
 	errs := resourceSystemdUnitRead(ctx, d, m)
