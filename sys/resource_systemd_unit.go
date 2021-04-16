@@ -240,17 +240,19 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 		rollback["enabled"] = strconv.FormatBool(enabled)
 		rollback["unit_file_state"] = unitFileState
 
-		if _, ok := d.GetOk("start"); ok {
+		if active {
+			d.Set("stop", !active)
 			d.Set("start", active)
-		}
-		if _, ok := d.GetOk("stop"); ok {
+		} else {
+			d.Set("start", active)
 			d.Set("stop", !active)
 		}
 
-		if _, ok := d.GetOk("enable"); ok {
+		if enabled {
+			d.Set("disable", !enabled)
 			d.Set("enable", enabled)
-		}
-		if _, ok := d.GetOk("disable"); ok {
+		} else {
+			d.Set("enable", enabled)
 			d.Set("disable", !enabled)
 		}
 	}
