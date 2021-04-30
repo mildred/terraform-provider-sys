@@ -2,9 +2,9 @@ package sys
 
 import (
 	"crypto/sha1"
-	"io/ioutil"
 	"encoding/base64"
 	"encoding/hex"
+	"io/ioutil"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )

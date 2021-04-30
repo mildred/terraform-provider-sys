@@ -1,17 +1,17 @@
 package sys
 
 import (
-	"bytes"
-	"os"
 	"bufio"
+	"bytes"
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
-	"context"
 	"sync"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 var debLock sync.Mutex
@@ -110,7 +110,7 @@ func debCreate(d *schema.ResourceData, m *providerConfiguration) diag.Diagnostic
 	debLock.Lock()
 	defer debLock.Unlock()
 
-	if ! m.debUpdated {
+	if !m.debUpdated {
 		stderr := new(bytes.Buffer)
 		cmd := exec.Command("apt-get", "update")
 		cmd.Stderr = stderr
@@ -174,11 +174,10 @@ func debDelete(d *schema.ResourceData, m *providerConfiguration) diag.Diagnostic
 }
 
 func resourcePackageDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	switch t := d.Get("type").(string); t{
+	switch t := d.Get("type").(string); t {
 	case "deb":
 		return debDelete(d, m.(*providerConfiguration))
 	default:
 		return diag.Errorf("Unknown package type %s", t)
 	}
 }
-

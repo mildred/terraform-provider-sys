@@ -86,6 +86,12 @@ func resourceFile() *schema.Resource {
 				Optional:    true,
 				Default:     false,
 			},
+			"clear_destination": {
+				Type:        schema.TypeBool,
+				Description: "Remove directory destination before recreating it. Must be used with force_overwrite",
+				Optional:    true,
+				Default:     false,
+			},
 		},
 	}
 }
@@ -247,6 +253,7 @@ func checksumFile(destination string) (string, error) {
 
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	forceOverwrite := d.Get("force_overwrite").(bool)
+	clearDestination := d.Get("clear_destination").(bool)
 	source, sourceSpecified := d.GetOk("source")
 	content, contentSpecified, err := resourceFileContent(d)
 	if err != nil {
@@ -275,6 +282,12 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		if !forceOverwrite {
 			if _, err := os.Lstat(destination); err == nil || !os.IsNotExist(err) {
 				return fmt.Errorf("destination exists at %v", destination)
+			}
+		}
+		if forceOverwrite && clearDestination && is_directory {
+			err := os.RemoveAll(destination)
+			if err != nil {
+				return fmt.Errorf("cannot delete target directory, %v", err)
 			}
 		}
 		if is_directory {

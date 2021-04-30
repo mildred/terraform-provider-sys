@@ -6,8 +6,8 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/mildred/terraform-provider-sys/sys/utils"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/mildred/terraform-provider-sys/sys/utils"
 )
 
 func resourceDir() *schema.Resource {
@@ -70,7 +70,7 @@ func resourceDirRead(d *schema.ResourceData, _ interface{}) error {
 	if err != nil {
 		return err
 	}
-	if ! same {
+	if !same {
 		d.Set("permission", st.Mode().String())
 	}
 
