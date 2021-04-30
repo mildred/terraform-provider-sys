@@ -92,6 +92,12 @@ func resourceFile() *schema.Resource {
 				Optional:    true,
 				Default:     false,
 			},
+			"symlink_destination": {
+				Type:        schema.TypeBool,
+				Description: "Symlink destination if source is a directory and target_directory is set.",
+				Optional:    true,
+				Default:     false,
+			},
 		},
 	}
 }
@@ -254,6 +260,7 @@ func checksumFile(destination string) (string, error) {
 func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	forceOverwrite := d.Get("force_overwrite").(bool)
 	clearDestination := d.Get("clear_destination").(bool)
+	symlink_destination := d.Get("symlink_destination").(bool)
 	source, sourceSpecified := d.GetOk("source")
 	content, contentSpecified, err := resourceFileContent(d)
 	if err != nil {
@@ -290,10 +297,29 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 				return fmt.Errorf("cannot delete target directory, %v", err)
 			}
 		}
+		configure := func(c *getter.Client) error {
+			getters := map[string]getter.Getter{}
+
+			if c.Getters == nil {
+				c.Getters = getter.Getters
+			}
+
+			for scheme, get := range c.Getters {
+				getters[scheme] = get
+			}
+
+			if !symlink_destination {
+				fileGetter := new(getter.FileGetter)
+				fileGetter.Copy = true
+				getters["file"] = fileGetter
+			}
+
+			return nil
+		}
 		if is_directory {
-			err = getter.GetAny(destination, source.(string))
+			err = getter.GetAny(destination, source.(string), configure)
 		} else {
-			err = getter.GetFile(destination, source.(string))
+			err = getter.GetFile(destination, source.(string), configure)
 		}
 		if err != nil {
 			return fmt.Errorf("cannot fetch source %v, %v", source, err)
