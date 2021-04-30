@@ -223,6 +223,16 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 		}
 	}
 
+	if st.Mode()&os.ModeSymlink != 0 {
+		link, err := os.Readlink(filename)
+		if err != nil {
+			return fmt.Errorf("readlink %s, %v", filename, err)
+		}
+
+		fmt.Fprintf(w, "%s", link)
+		return nil
+	}
+
 	f, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("cannot open file %s, %v", filename, err)
@@ -241,11 +251,13 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 			fmt.Fprintf(w, "%d.%s.%d.", len(fst.Name()), fst.Name(), fst.Size())
 			readFileOrDir(w, path.Join(filename, fst.Name()), fst)
 		}
-	} else {
+	} else if st.Mode().IsRegular() {
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return fmt.Errorf("reading %s, %e", filename, err)
+			return fmt.Errorf("reading %s, %v", filename, err)
 		}
+	} else {
+		return fmt.Errorf("cannot handle %s type %s", filename, st.Mode().String())
 	}
 	return nil
 }

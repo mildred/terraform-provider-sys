@@ -84,7 +84,7 @@ First, build the provider:
 
 If necessary, deploy the provider to a remote host
 
-    rsync --rsh=ssh --info=progress2 terraform-provider-sys user@host:/tmp/terraform-provider-sys
+    rsync -z --rsh=ssh --info=progress2 terraform-provider-sys user@host:/tmp/terraform-provider-sys
 
 Place this snippet first in `~/.terraformrc`:
 
@@ -96,7 +96,7 @@ Place this snippet first in `~/.terraformrc`:
       # null provider plugin in the given directory.
       dev_overrides {
         # The directory should contain a terraform-provider-sys executable
-        "mildred/sys" = "/path/to/provider/dir/"
+        "mildred/sys" = "/tmp"
       }
 
       # For all other providers, install them directly from their origin provider

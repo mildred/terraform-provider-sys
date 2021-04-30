@@ -14,7 +14,7 @@ while true; do
   esac
 done
 
-if tag && [[ ${1:0:1} != v ]]; then
+if $tag && [[ "${1:0:1}" != v ]]; then
   echo "Usage $0 [--no-tag] vX.Y.Z [TAG_MESSAGE]"
   exit 1
 fi
