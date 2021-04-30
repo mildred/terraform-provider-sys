@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
@@ -12,8 +13,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/mildred/terraform-provider-sys/sys/file_getter"
 	"github.com/mildred/terraform-provider-sys/sys/utils"
 )
 
@@ -312,30 +314,28 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 				return fmt.Errorf("cannot delete target directory, %v", err)
 			}
 		}
-		configure := func(c *getter.Client) error {
-			getters := map[string]getter.Getter{}
-
-			if c.Getters == nil {
-				c.Getters = getter.Getters
-			}
-
-			for scheme, get := range c.Getters {
-				getters[scheme] = get
-			}
-
-			if !symlink_destination {
-				fileGetter := new(getter.FileGetter)
-				fileGetter.Copy = true
-				getters["file"] = fileGetter
-			}
-
-			return nil
+		get := &getter.Client{
+			Getters:       getter.Getters,
+			Decompressors: getter.Decompressors,
 		}
+
+		if !symlink_destination {
+			fileGetter := new(file_getter.FileGetter)
+			get.Getters = append([]getter.Getter{fileGetter}, get.Getters...)
+		}
+
+		var mode = getter.ModeFile
 		if is_directory {
-			err = getter.GetAny(destination, source.(string), configure)
-		} else {
-			err = getter.GetFile(destination, source.(string), configure)
+			mode = getter.ModeAny
 		}
+
+		_, err = get.Get(context.TODO(), &getter.Request{
+			Src:     source.(string),
+			Dst:     destination,
+			GetMode: mode,
+			Copy:    !symlink_destination,
+		})
+
 		if err != nil {
 			return fmt.Errorf("cannot fetch source %v, %v", source, err)
 		}
