@@ -31,9 +31,9 @@ GPG_FINGERPRINT=01230FD4CC29DE17
 
 if $tag; then
   git tag -s -u $GPG_FINGERPRINT -m "$msg" "$ver"
+  git push origin "$ver"
 fi
 
 goreleaser release --rm-dist
 
-git push origin "$ver"
 

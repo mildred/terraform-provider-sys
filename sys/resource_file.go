@@ -219,20 +219,20 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 	if st == nil {
 		st, err = os.Lstat(filename)
 		if err != nil {
-			return err
+			return fmt.Errorf("lstat %s, %e", filename, err)
 		}
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return fmt.Errorf("cannot open file, %v", err)
+		return fmt.Errorf("cannot open file %s, %v", filename, err)
 	}
 	defer f.Close()
 
 	if st.IsDir() {
 		files, err := f.Readdir(-1)
 		if err != nil {
-			return err
+			return fmt.Errorf("readdir %s, %e", filename, err)
 		}
 		sort.Slice(files, func(a, b int) bool {
 			return files[a].Name() < files[b].Name()
@@ -245,6 +245,7 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 		_, err = io.Copy(w, f)
 	}
 	return err
+	return fmt.Errorf("reading %s, %e", filename, err)
 }
 
 func checksumFile(destination string) (string, error) {
