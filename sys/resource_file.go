@@ -178,7 +178,10 @@ func resourceFileContent(d *schema.ResourceData) ([]byte, bool, error) {
 }
 
 func resourceFileUpdate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
-	destination := d.Get("path").(string)
+	destination, _, err := getDestination(d)
+	if err != nil {
+		return diag.Errorf("cdestination, %s", err)
+	}
 
 	if d.HasChange("file_permission") {
 		perm := d.Get("file_permission").(string)
