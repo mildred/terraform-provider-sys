@@ -152,7 +152,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	} else {
 		sum, err := checksumFile(outputPath)
 		if err != nil {
-			return fmt.Errorf("Cannot checksum, %v", err)
+			return fmt.Errorf("Cannot checksum %s, %v", outputPath, err)
 		}
 		d.SetId(sum)
 	}
@@ -243,9 +243,11 @@ func readFileOrDir(w io.Writer, filename string, st os.FileInfo) error {
 		}
 	} else {
 		_, err = io.Copy(w, f)
+		if err != nil {
+			return fmt.Errorf("reading %s, %e", filename, err)
+		}
 	}
-	return err
-	return fmt.Errorf("reading %s, %e", filename, err)
+	return nil
 }
 
 func checksumFile(destination string) (string, error) {
@@ -359,7 +361,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		}
 		id, err := checksumFile(destination)
 		if err != nil {
-			return fmt.Errorf("cannot checksum file, %v", err)
+			return fmt.Errorf("cannot checksum file %s, %v", destination, err)
 		}
 		d.SetId(id)
 	}

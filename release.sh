@@ -27,7 +27,7 @@ echo "Making release for $ver"
 set -xe
 
 eval $(pass show sites/github.com | grep GITHUB_TOKEN)
-GPG_FINGERPRINT=01230FD4CC29DE17
+export GPG_FINGERPRINT=01230FD4CC29DE17
 
 if $tag; then
   git tag -s -u $GPG_FINGERPRINT -m "$msg" "$ver"
