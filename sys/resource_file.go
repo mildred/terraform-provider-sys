@@ -14,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/go-getter/v2"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mildred/terraform-provider-sys/sys/file_getter"
 	"github.com/mildred/terraform-provider-sys/sys/utils"
@@ -21,10 +22,10 @@ import (
 
 func resourceFile() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceFileCreate,
-		Read:   resourceFileRead,
-		Delete: resourceFileDelete,
-		Update: resourceFileUpdate,
+		CreateContext: resourceFileCreate,
+		ReadContext:   resourceFileRead,
+		DeleteContext: resourceFileDelete,
+		UpdateContext: resourceFileUpdate,
 
 		Schema: map[string]*schema.Schema{
 			"content": {
@@ -116,10 +117,10 @@ type resourceFileSystemd struct {
 	had_start  bool
 }
 
-func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
+func resourceFileRead(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	outputPath, isDir, err := getDestination(d)
 	if err != nil {
-		return err
+		return diag.Errorf("cannot get destination, %v", err)
 	}
 
 	// If the output file doesn't exist, mark the resource for creation.
@@ -131,7 +132,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 
 	same, err := utils.FileModeSame(d.Get("file_permission").(string), st.Mode(), utils.Umask)
 	if err != nil {
-		return err
+		return diag.Errorf("checking file mode, %v", err)
 	}
 	if !same {
 		d.Set("file_permission", st.Mode().String())
@@ -143,7 +144,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	if !isDir {
 		outputContent, err := ioutil.ReadFile(outputPath)
 		if err != nil {
-			return fmt.Errorf("Cannot read file, %v", err)
+			return diag.Errorf("cannot read file, %v", err)
 		}
 
 		outputChecksum := sha1.Sum([]byte(outputContent))
@@ -154,7 +155,7 @@ func resourceFileRead(d *schema.ResourceData, _ interface{}) error {
 	} else {
 		sum, err := checksumFile(outputPath)
 		if err != nil {
-			return fmt.Errorf("Cannot checksum %s, %v", outputPath, err)
+			return diag.Errorf("cannot checksum %s, %v", outputPath, err)
 		}
 		d.SetId(sum)
 	}
@@ -176,7 +177,7 @@ func resourceFileContent(d *schema.ResourceData) ([]byte, bool, error) {
 	return nil, false, nil
 }
 
-func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
+func resourceFileUpdate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	destination := d.Get("path").(string)
 
 	if d.HasChange("file_permission") {
@@ -186,7 +187,7 @@ func resourceFileUpdate(d *schema.ResourceData, _ interface{}) error {
 
 		err := os.Chmod(destination, mode)
 		if err != nil {
-			return fmt.Errorf("cannot chmod %s, %s", mode, err)
+			return diag.Errorf("cannot chmod %s, %s", mode, err)
 		}
 	}
 
@@ -274,19 +275,19 @@ func checksumFile(destination string) (string, error) {
 	return hex.EncodeToString(checksum[:]), nil
 }
 
-func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
+func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	forceOverwrite := d.Get("force_overwrite").(bool)
 	clearDestination := d.Get("clear_destination").(bool)
 	symlink_destination := d.Get("symlink_destination").(bool)
 	source, sourceSpecified := d.GetOk("source")
 	content, contentSpecified, err := resourceFileContent(d)
 	if err != nil {
-		return fmt.Errorf("content error, %v", err)
+		return diag.Errorf("content error, %v", err)
 	}
 
 	destination, is_directory, err := getDestination(d)
 	if err != nil {
-		return err
+		return diag.Errorf("finding destination, %v", err)
 	}
 
 	destinationDir := path.Dir(destination)
@@ -294,7 +295,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		dirPerm := d.Get("directory_permission").(string)
 		dirMode, _ := strconv.ParseInt(dirPerm, 8, 64)
 		if err := os.MkdirAll(destinationDir, os.FileMode(dirMode)); err != nil {
-			return fmt.Errorf("cannot create parent directories, %v", err)
+			return diag.Errorf("cannot create parent directories, %v", err)
 		}
 	}
 
@@ -305,13 +306,13 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	if sourceSpecified {
 		if !forceOverwrite {
 			if _, err := os.Lstat(destination); err == nil || !os.IsNotExist(err) {
-				return fmt.Errorf("destination exists at %v", destination)
+				return diag.Errorf("destination exists at %v", destination)
 			}
 		}
 		if forceOverwrite && clearDestination && is_directory {
 			err := os.RemoveAll(destination)
 			if err != nil {
-				return fmt.Errorf("cannot delete target directory, %v", err)
+				return diag.Errorf("cannot delete target directory, %v", err)
 			}
 		}
 		get := &getter.Client{
@@ -329,7 +330,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 			mode = getter.ModeAny
 		}
 
-		_, err = get.Get(context.TODO(), &getter.Request{
+		_, err = get.Get(ctx, &getter.Request{
 			Src:     source.(string),
 			Dst:     destination,
 			GetMode: mode,
@@ -337,7 +338,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		})
 
 		if err != nil {
-			return fmt.Errorf("cannot fetch source %v, %v", source, err)
+			return diag.Errorf("cannot fetch source %v, %v", source, err)
 		}
 	}
 
@@ -351,7 +352,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 		}
 		f, err := os.OpenFile(destination, flags, os.FileMode(fileMode))
 		if err != nil {
-			return fmt.Errorf("cannot write file, %v", err)
+			return diag.Errorf("cannot write file, %v", err)
 		}
 		n, err := f.Write(data)
 		if err == nil && n < len(data) {
@@ -361,7 +362,7 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 			err = err1
 		}
 		if err != nil {
-			return fmt.Errorf("cannot write file, %v", err)
+			return diag.Errorf("cannot write file, %v", err)
 		}
 
 		checksum := sha1.Sum([]byte(content))
@@ -369,11 +370,11 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	} else {
 		err = os.Chmod(destination, os.FileMode(fileMode))
 		if err != nil {
-			return fmt.Errorf("cannot chmod %s, %v", filePerm, err)
+			return diag.Errorf("cannot chmod %s, %v", filePerm, err)
 		}
 		id, err := checksumFile(destination)
 		if err != nil {
-			return fmt.Errorf("cannot checksum file %s, %v", destination, err)
+			return diag.Errorf("cannot checksum file %s, %v", destination, err)
 		}
 		d.SetId(id)
 	}
@@ -381,18 +382,18 @@ func resourceFileCreate(d *schema.ResourceData, _ interface{}) error {
 	return nil
 }
 
-func resourceFileDelete(d *schema.ResourceData, _ interface{}) error {
+func resourceFileDelete(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	if filename := d.Get("filename").(string); filename != "" {
 		err := os.Remove(filename)
 		if err != nil {
-			return fmt.Errorf("cannot delete file, %v", err)
+			return diag.Errorf("cannot delete file, %v", err)
 		}
 	}
 
 	if target_directory := d.Get("target_directory").(string); target_directory != "" {
 		err := os.RemoveAll(target_directory)
 		if err != nil {
-			return fmt.Errorf("cannot delete target directory, %v", err)
+			return diag.Errorf("cannot delete target directory, %v", err)
 		}
 	}
 
