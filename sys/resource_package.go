@@ -38,6 +38,11 @@ func resourcePackage() *schema.Resource {
 				Optional: true,
 				ForceNew: true,
 			},
+			"target_release": {
+				Type:     schema.TypeString,
+				Optional: true,
+				ForceNew: true,
+			},
 			"installed_version": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -126,6 +131,11 @@ func debCreate(d *schema.ResourceData, m *providerConfiguration) diag.Diagnostic
 	version := d.Get("version")
 	if version != nil && version.(string) != "" {
 		pkgspec = fmt.Sprintf("%s=%s", pkgspec, version)
+	}
+
+	target_release := d.Get("target_release")
+	if target_release != nil && target_release.(string) != "" {
+		pkgspec = fmt.Sprintf("%s/%s", pkgspec, target_release)
 	}
 
 	stderr := new(bytes.Buffer)
