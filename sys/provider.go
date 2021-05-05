@@ -2,6 +2,7 @@ package sys
 
 import (
 	"context"
+	"sync"
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -36,6 +37,8 @@ func Provider() *schema.Provider {
 type providerConfiguration struct {
 	debUpdated bool
 	Logger     hclog.Logger
+	SdLocks    map[string]sync.Locker
+	Lock       sync.Mutex
 }
 
 func providerConfigure(ctx context.Context, data *schema.ResourceData) (interface{}, diag.Diagnostics) {

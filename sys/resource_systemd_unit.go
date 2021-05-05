@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 
 	systemd "github.com/coreos/go-systemd/v22/dbus"
 
@@ -172,7 +173,32 @@ func sdConn(ctx context.Context, d *schema.ResourceData, m interface{}) (*system
 	}
 }
 
+func sdUnitLock(m interface{}, unit string) sync.Locker {
+	c := m.(*providerConfiguration)
+	var lock sync.Locker
+
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
+
+	if mutex, ok := c.SdLocks[unit]; ok {
+		lock = mutex
+	} else {
+		lock = &sync.Mutex{}
+		c.SdLocks[unit] = lock
+	}
+	return lock
+}
+
 func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	unit := d.Get("name").(string)
+	lock := sdUnitLock(m, unit)
+	lock.Lock()
+	defer lock.Unlock()
+
+	return resourceSystemdUnitReadUnlocked(ctx, d, m)
+}
+
+func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
@@ -240,6 +266,11 @@ func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m inte
 }
 
 func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	unit := d.Get("name").(string)
+	lock := sdUnitLock(m, unit)
+	lock.Lock()
+	defer lock.Unlock()
+
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
@@ -252,7 +283,7 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	errs := resourceSystemdUnitRead(ctx, d, m)
+	errs := resourceSystemdUnitReadUnlocked(ctx, d, m)
 	if errs != nil {
 		return errs
 	}
@@ -261,14 +292,17 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 }
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	unit := d.Get("name").(string)
+	lock := sdUnitLock(m, unit)
+	lock.Lock()
+	defer lock.Unlock()
+
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
 	}
 
 	defer sd.Close()
-
-	unit := d.Get("name").(string)
 
 	rollback := d.Get("rollback").(map[string]interface{})
 	rollback_active := parseBoolDef(rollback["active"], false)
@@ -296,7 +330,7 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 		return diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
 	}
 
-	errs := resourceSystemdUnitRead(ctx, d, m)
+	errs := resourceSystemdUnitReadUnlocked(ctx, d, m)
 	if errs != nil {
 		return errs
 	}
@@ -358,6 +392,11 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 }
 
 func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	unit := d.Get("name").(string)
+	lock := sdUnitLock(m, unit)
+	lock.Lock()
+	defer lock.Unlock()
+
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
@@ -365,7 +404,6 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 
 	defer sd.Close()
 
-	unit := d.Get("name").(string)
 	start, has_start := d.GetOkExists("start")
 	enable, has_enable := d.GetOkExists("enable")
 
@@ -404,7 +442,7 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 		}
 	}
 
-	errs := resourceSystemdUnitRead(ctx, d, m)
+	errs := resourceSystemdUnitReadUnlocked(ctx, d, m)
 	if errs != nil {
 		return errs
 	}
