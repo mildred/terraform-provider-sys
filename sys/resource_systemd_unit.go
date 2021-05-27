@@ -30,8 +30,12 @@ func resourceSystemdUnit() *schema.Resource {
 				Description: "Enable the unit",
 				Optional:    true,
 			},
-			"start": {
+			"mask": {
+				Description: "Mask the unit",
 				Type:        schema.TypeBool,
+				Optional:    true,
+			},
+			"start": {
 				Description: "Start the unit",
 				Optional:    true,
 			},
@@ -131,6 +135,14 @@ func sdIsFailed(active_state string) bool {
 	return active_state == systemdFailed
 }
 
+func sdMaskString(enable bool) string {
+	if enable {
+		return "mask"
+	} else {
+		return "unmask"
+	}
+}
+
 func sdEnableString(enable bool) string {
 	if enable {
 		return "enable"
@@ -150,6 +162,15 @@ func sdStartString(start bool) string {
 func sdIsEnabled(unit_file_state string) bool {
 	switch unit_file_state {
 	case systemdEnabled, systemdEnabledRuntime, systemdStatic, systemdAlias, systemdIndirect, systemdGenerated:
+		return true
+	default:
+		return false
+	}
+}
+
+func sdIsMasked(unit_file_state string) bool {
+	switch unit_file_state {
+	case systemdMasked, systemdMaskedRuntime:
 		return true
 	default:
 		return false
@@ -180,12 +201,18 @@ func sdUnitLock(m interface{}, unit string) sync.Locker {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
-	if mutex, ok := c.SdLocks[unit]; ok {
+	if c.SdLocks == nil {
+		lock = &sync.Mutex{}
+		c.SdLocks = map[string]sync.Locker{
+			unit: lock,
+		}
+	} else if mutex, ok := c.SdLocks[unit]; ok {
 		lock = mutex
 	} else {
 		lock = &sync.Mutex{}
 		c.SdLocks[unit] = lock
 	}
+
 	return lock
 }
 
@@ -356,6 +383,22 @@ func resourceSystemdEnable(ctx context.Context, d *schema.ResourceData, sd *syst
 	return err
 }
 
+func resourceSystemdMask(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, maskState string) error {
+	unit := d.Get("name").(string)
+	unitFileState, err := sd.GetUnitFileStateContext(ctx, unit)
+	if err != nil {
+		return fmt.Errorf("cannot get unit file state for %s: %v", unit, err)
+	}
+
+	if maskState != unitFileState && sdIsMasked(maskState) {
+		_, err = sd.MaskUnitFilesContext(ctx, []string{unit}, maskState == systemdMaskedRuntime, true)
+	} else if sdIsMasked(unitFileState) && !sdIsMasked(maskState) {
+		_, err = sd.UnmaskUnitFilesContext(ctx, []string{unit}, false)
+	}
+
+	return err
+}
+
 func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *systemd.Conn, activate, restart bool) error {
 	unit := d.Get("name").(string)
 	statuses, err := sd.ListUnitsByNamesContext(ctx, []string{unit})
@@ -406,10 +449,12 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 
 	start, has_start := d.GetOkExists("start")
 	enable, has_enable := d.GetOkExists("enable")
+	mask, has_mask := d.GetOkExists("enable")
 
 	rollback := d.Get("rollback").(map[string]interface{})
 	rollback_active := parseBoolDef(rollback["active"], false)
 	rollback_enable := parseBoolDef(rollback["enabled"], false)
+	rollback_load_state := rollback["load_state"]
 
 	err = sd.ReloadContext(ctx)
 	if err != nil {
@@ -425,6 +470,22 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 		err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 		if err != nil {
 			return diag.Errorf("cannot rollback %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+		}
+	}
+
+	if mask != nil && has_mask && d.HasChange("mask") {
+		var maskState string
+		if mask.(bool) {
+			maskState = systemdMasked
+		}
+		err = resourceSystemdMask(ctx, d, sd, maskState)
+		if err != nil {
+			return diag.Errorf("cannot %s unit %s: %v", sdMaskString(mask.(bool)), unit, err)
+		}
+	} else if rollback_load_state != nil && (!has_mask || mask == nil) {
+		err = resourceSystemdMask(ctx, d, sd, rollback_load_state.(string))
+		if err != nil {
+			return diag.Errorf("cannot rollback %s unit %s: %v", sdMaskString(sdIsMasked(rollback_load_state.(string))), unit, err)
 		}
 	}
 
