@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
+// https://www.freedesktop.org/wiki/Software/systemd/dbus/
+
 func resourceSystemdUnit() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: resourceSystemdUnitCreate,
@@ -19,15 +21,18 @@ func resourceSystemdUnit() *schema.Resource {
 		DeleteContext: resourceSystemdUnitDelete,
 		UpdateContext: resourceSystemdUnitUpdate,
 
+		Description: "Handles a systemd unit with the dBus API.",
+
 		Schema: map[string]*schema.Schema{
 			"name": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Description: "systemd unit name",
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
 			},
 			"enable": {
-				Type:        schema.TypeBool,
 				Description: "Enable the unit",
+				Type:        schema.TypeBool,
 				Optional:    true,
 			},
 			"mask": {
@@ -37,57 +42,64 @@ func resourceSystemdUnit() *schema.Resource {
 			},
 			"start": {
 				Description: "Start the unit",
+				Type:        schema.TypeBool,
 				Optional:    true,
 			},
 			"restart_on": {
-				Type:        schema.TypeMap,
 				Description: "Restart unit if this changes",
+				Type:        schema.TypeMap,
 				Optional:    true,
 			},
 			"rollback": {
-				Type:        schema.TypeMap,
 				Description: "Rollback information to restore once the unit is destroyed",
+				Type:        schema.TypeMap,
 				Computed:    true,
 			},
 			"system": {
+				Description:   "Uses the system systemd socket",
 				Type:          schema.TypeBool,
-				Description:   "System systemd socket",
 				Optional:      true,
 				ConflictsWith: []string{"user"},
 			},
 			"user": {
+				Description:   "Uses the user systemd socket",
 				Type:          schema.TypeBool,
-				Description:   "User systemd socket",
 				Optional:      true,
 				ConflictsWith: []string{"system"},
 			},
 			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Description: "Unit description",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 			"load_state": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Description: "Unit load state",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 			"active_state": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Description: "Unit active state",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 			"sub_state": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Description: "Unit sub-state (specific to the unit type)",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 			"followed": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"job_id": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Description: "Internal systemd job id",
+				Type:        schema.TypeInt,
+				Computed:    true,
 			},
 			"job_type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Description: "Internal systemd job type",
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 		},
 	}

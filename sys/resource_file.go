@@ -27,14 +27,27 @@ func resourceFile() *schema.Resource {
 		DeleteContext: resourceFileDelete,
 		UpdateContext: resourceFileUpdate,
 
+		Description: `
+sys_file generates a local, similarly to local_file, with a number of options. Files or directories can be generated from:
+- direct file content (plain, base64 or sensitive)
+- source file to copy, with the ability to fetch remote repositories or files from archives using go-getter.
+- source directory to copy (local or remote using go-getter).
+
+Any required parent directories will be created automatically, and any existing file with the given name will be overwritten.
+
+If the destination file exists, creation will block. However the resource has the ability to remove it if it exists prior to running in every case, or force overwriting it. if the source is a local file or directory, it can generate a symlink too (default behaviour of go-getter).
+`,
+
 		Schema: map[string]*schema.Schema{
 			"content": {
+				Description:   "The content of file to create. Conflicts with `sensitive_content` and `content_base64`.",
 				Type:          schema.TypeString,
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"sensitive_content", "content_base64", "source"},
 			},
 			"sensitive_content": {
+				Description:   "The content of file to create. Will not be displayed in diffs. Conflicts with `content` and `content_base64`.",
 				Type:          schema.TypeString,
 				Optional:      true,
 				ForceNew:      true,
@@ -42,62 +55,64 @@ func resourceFile() *schema.Resource {
 				ConflictsWith: []string{"content", "content_base64", "source"},
 			},
 			"content_base64": {
+				Description:   "The base64 encoded content of the file to create. Use this when dealing with binary data. Conflicts with `content` and `sensitive_content`.",
 				Type:          schema.TypeString,
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"sensitive_content", "content", "source"},
 			},
 			"source": {
+				Description:   "The source file to copy, compatible with go-getter.",
 				Type:          schema.TypeString,
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"content", "sensitive_content", "content_base64"},
 			},
 			"filename": {
+				Description:   "(Required unless `target_directory` is specified) The path of the file to create.",
 				Type:          schema.TypeString,
-				Description:   "Path to the output file",
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"target_directory"},
 			},
 			"target_directory": {
+				Description:   "(Conflicts with `filename` or `content*`) The path of target directory where the file should be put, must not exists unless `force_overwrite` is `true`. Upon resource deletion, the target directory will be entorely removed with no additional check. Can be useful when the source is an archive that go-getter extracts (it will refuse to do so with `filename`).",
 				Type:          schema.TypeString,
-				Description:   "Target directory path",
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"filename", "content", "sensitive_content", "content_base64"},
 			},
 			"file_permission": {
+				Description:  "(default: \"0777\") The permission to set for the created file. Expects an a string.",
 				Type:         schema.TypeString,
-				Description:  "Permissions to set for the output file",
 				Optional:     true,
 				ForceNew:     true,
 				Default:      "0777",
 				ValidateFunc: validateMode,
 			},
 			"directory_permission": {
+				Description:  "(default: \"0777\") The permission to set for any directories created. Expects a string.",
 				Type:         schema.TypeString,
-				Description:  "Permissions to set for directories created",
 				Optional:     true,
 				ForceNew:     true,
 				Default:      "0777",
 				ValidateFunc: validateMode,
 			},
 			"force_overwrite": {
+				Description: "(default: false) When `true`, allows to overwrite target file or directory.",
 				Type:        schema.TypeBool,
-				Description: "Force overwrite an existing file",
 				Optional:    true,
 				Default:     false,
 			},
 			"clear_destination": {
+				Description: "(default: false) Remove directory destination before recreating it. Must be used with force_overwrite",
 				Type:        schema.TypeBool,
-				Description: "Remove directory destination before recreating it. Must be used with force_overwrite",
 				Optional:    true,
 				Default:     false,
 			},
 			"symlink_destination": {
+				Description: "(default: false) Symlink destination if source is a directory and target_directory is set.",
 				Type:        schema.TypeBool,
-				Description: "Symlink destination if source is a directory and target_directory is set.",
 				Optional:    true,
 				Default:     false,
 			},

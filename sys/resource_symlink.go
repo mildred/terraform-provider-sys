@@ -13,6 +13,8 @@ func resourceSymlink() *schema.Resource {
 		Delete: resourceSymlinkDelete,
 		Exists: resourceSymlinkExists,
 
+		Description: "Creates a symlink",
+
 		Schema: map[string]*schema.Schema{
 			"source": {
 				Type:        schema.TypeString,

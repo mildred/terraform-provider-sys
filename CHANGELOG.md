@@ -10,3 +10,19 @@
 
 * Fix crash in sys_file
 * Add sys_package.target_release
+
+## 1.3.13
+
+* sys_file: allow copying directories
+
+## 1.3.8
+
+* sys_file: implement symlink_destination
+
+## 1.3.7
+
+* sys_file: implement clear_destination
+
+## 1.3.1
+
+* sys_service: use dBus systemd API instead of shell commands
