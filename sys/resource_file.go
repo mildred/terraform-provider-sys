@@ -83,11 +83,11 @@ If the destination file exists, creation will block. However the resource has th
 				ConflictsWith: []string{"filename", "content", "sensitive_content", "content_base64"},
 			},
 			"file_permission": {
-				Description:  "(default: \"0777\") The permission to set for the created file. Expects an a string.",
+				Description:  "(default: \"0666\") The permission to set for the created file. Expects an a string.",
 				Type:         schema.TypeString,
 				Optional:     true,
 				ForceNew:     true,
-				Default:      "0777",
+				Default:      "0666",
 				ValidateFunc: validateMode,
 			},
 			"directory_permission": {

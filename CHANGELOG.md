@@ -1,3 +1,7 @@
+## 1.3.17
+
+* sys_file: defaults to not executable
+
 ## 1.3.16
 
 * sys_file: add ability to mask units
