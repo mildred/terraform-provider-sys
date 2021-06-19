@@ -294,7 +294,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 
 		enabled := sdIsEnabled(unitFileState)
 		active := sdIsActive(status.ActiveState)
-		masked := sdIsMasked(status.ActiveState)
+		masked := sdIsMasked(status.LoadState)
 		rollback["active"] = strconv.FormatBool(active)
 		rollback["enabled"] = strconv.FormatBool(enabled)
 		rollback["masked"] = strconv.FormatBool(masked)
@@ -344,7 +344,7 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 		return errs
 	}
 
-	return resourceSystemdUnitUpdate(ctx, d, m)
+	return resourceSystemdUnitUpdateUnlocked(ctx, d, m)
 }
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -468,6 +468,12 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 	lock := sdUnitLock(m, unit)
 	lock.Lock()
 	defer lock.Unlock()
+
+	return resourceSystemdUnitUpdateUnlocked(ctx, d, m)
+}
+
+func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	unit := d.Get("name").(string)
 
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
