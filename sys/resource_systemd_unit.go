@@ -31,19 +31,22 @@ func resourceSystemdUnit() *schema.Resource {
 				ForceNew:    true,
 			},
 			"enable": {
-				Description: "Enable the unit",
-				Type:        schema.TypeBool,
-				Optional:    true,
+				Description:      "Enable the unit",
+				Type:             schema.TypeBool,
+				Optional:         true,
+				DiffSuppressFunc: diffSuppressIfNil,
 			},
 			"mask": {
-				Description: "Mask the unit",
-				Type:        schema.TypeBool,
-				Optional:    true,
+				Description:      "Mask the unit",
+				Type:             schema.TypeBool,
+				Optional:         true,
+				DiffSuppressFunc: diffSuppressIfNil,
 			},
 			"start": {
-				Description: "Start the unit",
-				Type:        schema.TypeBool,
-				Optional:    true,
+				Description:      "Start the unit",
+				Type:             schema.TypeBool,
+				Optional:         true,
+				DiffSuppressFunc: diffSuppressIfNil,
 			},
 			"restart_on": {
 				Description: "Restart unit if this changes",
@@ -138,6 +141,11 @@ const (
 	systemdDead    = "dead"
 	systemdRunning = "running"
 )
+
+func diffSuppressIfNil(k, old, new string, d *schema.ResourceData) bool {
+	_, has_value := d.GetOkExists(k)
+	return !has_value
+}
 
 func sdIsActive(active_state string) bool {
 	return active_state == systemdActive || active_state == systemdReloading
