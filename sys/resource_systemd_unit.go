@@ -294,7 +294,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 
 		enabled := sdIsEnabled(unitFileState)
 		active := sdIsActive(status.ActiveState)
-		masked := sdIsMasked(status.ActiveState)
+		masked := sdIsMasked(status.LoadState)
 		rollback["active"] = strconv.FormatBool(active)
 		rollback["enabled"] = strconv.FormatBool(enabled)
 		rollback["masked"] = strconv.FormatBool(masked)
