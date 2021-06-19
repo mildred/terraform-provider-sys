@@ -1,5 +1,9 @@
 ## 1.3.18
 
+* sys_systemd_unit: fix masked
+
+## 1.3.18
+
 * sys_systemd_unit: does not produces a diff when start/enable/mask is unset
 
 ## 1.3.17

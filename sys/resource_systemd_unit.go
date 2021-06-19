@@ -294,12 +294,21 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 
 		enabled := sdIsEnabled(unitFileState)
 		active := sdIsActive(status.ActiveState)
+		masked := sdIsMasked(status.ActiveState)
 		rollback["active"] = strconv.FormatBool(active)
 		rollback["enabled"] = strconv.FormatBool(enabled)
+		rollback["masked"] = strconv.FormatBool(masked)
 		rollback["unit_file_state"] = unitFileState
 
-		d.Set("start", active)
-		d.Set("enable", enabled)
+		if _, has_start := d.GetOkExists("start"); has_start {
+			d.Set("start", active)
+		}
+		if _, has_enable := d.GetOkExists("enable"); has_enable {
+			d.Set("enable", enabled)
+		}
+		if _, has_mask := d.GetOkExists("mask"); has_mask {
+			d.Set("mask", masked)
+		}
 	}
 
 	if _, ok := d.GetOk("rollback"); !ok {
@@ -469,7 +478,7 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 
 	start, has_start := d.GetOkExists("start")
 	enable, has_enable := d.GetOkExists("enable")
-	mask, has_mask := d.GetOkExists("enable")
+	mask, has_mask := d.GetOkExists("mask")
 
 	rollback := d.Get("rollback").(map[string]interface{})
 	rollback_active := parseBoolDef(rollback["active"], false)
