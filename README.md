@@ -105,3 +105,4 @@ Place this snippet first in `~/.terraformrc`:
       direct {}
     }
 
+Terraform provider traces can be anabledby setting `TF_LOG_PROVIDER=TRACE`.

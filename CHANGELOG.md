@@ -1,3 +1,7 @@
+## 1.3.22
+
+* sys_systemd_unit: fix deadlock in unit activation (appears on rollback)
+
 ## 1.3.21
 
 * sys_systemd_unit: fix creation

@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"sync"
 
@@ -238,6 +239,7 @@ func sdUnitLock(m interface{}, unit string) sync.Locker {
 
 func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	unit := d.Get("name").(string)
+	log.Printf("[DEBUG] About to read %s\n", unit)
 	lock := sdUnitLock(m, unit)
 	lock.Lock()
 	defer lock.Unlock()
@@ -323,6 +325,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 
 func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	unit := d.Get("name").(string)
+	log.Printf("[DEBUG] About to create %s\n", unit)
 	lock := sdUnitLock(m, unit)
 	lock.Lock()
 	defer lock.Unlock()
@@ -349,10 +352,12 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	unit := d.Get("name").(string)
+	log.Printf("[DEBUG] About to delete %s\n", unit)
 	lock := sdUnitLock(m, unit)
 	lock.Lock()
 	defer lock.Unlock()
 
+	log.Printf("[DEBUG] connect to systemd\n")
 	sd, err := sdConn(ctx, d, m)
 	if err != nil {
 		return diag.Errorf("cannot connect to systemd: %v", err)
@@ -364,6 +369,7 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	rollback_active := parseBoolDef(rollback["active"], false)
 	rollback_enable := parseBoolDef(rollback["enabled"], false)
 
+	log.Printf("[DEBUG] systemctl daemon-reload\n")
 	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
@@ -371,9 +377,11 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 
 	// If unknown by systemd, there is nothing to rollback
 	if d.Id() == "" {
+		log.Printf("[DEBUG] Deleted %s (no rollback)\n", unit)
 		return nil
 	}
 
+	log.Printf("[DEBUG] Rollback %s %s\n", sdEnableString(rollback_enable), unit)
 	err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 	if err != nil {
 		return diag.Errorf("cannot %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
@@ -381,11 +389,13 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 
 	restart := d.HasChange("restart_on")
 
+	log.Printf("[DEBUG] Rollback %s %s (restart: %v)\n", sdStartString(rollback_active), unit, restart)
 	err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
 	if err != nil {
 		return diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
 	}
 
+	log.Printf("[DEBUG] Read unit %s after rollback\n", unit)
 	errs := resourceSystemdUnitReadUnlocked(ctx, d, m)
 	if errs != nil {
 		return errs
@@ -434,6 +444,7 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 	if err != nil || len(statuses) < 1 {
 		return fmt.Errorf("cannot query unit %s: %v", unit, err)
 	}
+	log.Printf("[TRACE] Activate %v %s (restart: %v): statuses = %v\n", activate, unit, restart, statuses)
 	status := statuses[0]
 
 	is_active := sdIsActive(status.LoadState)
@@ -441,16 +452,23 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 	complete := make(chan string)
 
 	if restart && activate {
+		log.Printf("[TRACE] Activate %v %s (restart: %v): systemctl restart %s\n", activate, unit, restart, unit)
 		_, err = sd.RestartUnitContext(ctx, unit, "replace", complete)
 	} else if !is_active && activate {
+		log.Printf("[TRACE] Activate %v %s (restart: %v): systemctl start %s\n", activate, unit, restart, unit)
 		_, err = sd.StartUnitContext(ctx, unit, "replace", complete)
 	} else if is_active && !activate {
+		log.Printf("[TRACE] Activate %v %s (restart: %v): systemctl stop %s\n", activate, unit, restart, unit)
 		_, err = sd.StopUnitContext(ctx, unit, "replace", complete)
+	} else {
+		close(complete)
+		return nil
 	}
 	if err != nil {
 		return err
 	}
 
+	log.Printf("[TRACE] Activate %v %s (restart: %v): wait for complete\n", activate, unit, restart)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -465,6 +483,7 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 
 func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	unit := d.Get("name").(string)
+	log.Printf("[DEBUG] About to update %s\n", unit)
 	lock := sdUnitLock(m, unit)
 	lock.Lock()
 	defer lock.Unlock()
