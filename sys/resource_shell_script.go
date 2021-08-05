@@ -64,8 +64,10 @@ func (err *ExitError) Error() string {
 
 func resourceShellScriptRead(d *schema.ResourceData, _ interface{}) error {
 	script, ok := d.GetOk("read")
+	cwd := d.Get("working_directory")
+	shell := d.Get("shell").(string)
 	if ok {
-		id, err := resourceShellScriptRun(d, script.(string))
+		id, err := resourceShellScriptRun(cwd, shell, script.(string))
 		d.SetId(id)
 		return err
 	} else if filename, ok := d.GetOk("filename"); ok {
@@ -82,12 +84,14 @@ func resourceShellScriptCreate(d *schema.ResourceData, _ interface{}) error {
 	script, ok := d.GetOk("create")
 	filename, okf := d.GetOk("filename")
 	_, okr := d.GetOk("read")
+	cwd := d.Get("working_directory")
+	shell := d.Get("shell").(string)
 	if ok && okr {
-		id, err := resourceShellScriptRun(d, script.(string))
+		id, err := resourceShellScriptRun(cwd, shell, script.(string))
 		d.SetId(id)
 		return err
 	} else if ok && okf {
-		_, err := resourceShellScriptRun(d, script.(string))
+		_, err := resourceShellScriptRun(cwd, shell, script.(string))
 		if err != nil {
 			return err
 		}
@@ -97,7 +101,7 @@ func resourceShellScriptCreate(d *schema.ResourceData, _ interface{}) error {
 		}
 		d.SetId(id)
 	} else if ok {
-		_, err := resourceShellScriptRun(d, script.(string))
+		_, err := resourceShellScriptRun(cwd, shell, script.(string))
 		d.SetId("1")
 		return err
 	} else {
@@ -108,8 +112,10 @@ func resourceShellScriptCreate(d *schema.ResourceData, _ interface{}) error {
 
 func resourceShellScriptDelete(d *schema.ResourceData, _ interface{}) error {
 	script, ok := d.GetOk("delete")
+	cwd := d.Get("working_directory")
+	shell := d.Get("shell").(string)
 	if ok {
-		_, err := resourceShellScriptRun(d, script.(string))
+		_, err := resourceShellScriptRun(cwd, shell, script.(string))
 		return err
 	} else if filename, ok := d.GetOk("filename"); ok {
 		return os.RemoveAll(filename.(string))
@@ -117,16 +123,17 @@ func resourceShellScriptDelete(d *schema.ResourceData, _ interface{}) error {
 	return nil
 }
 
-func resourceShellScriptRun(d *schema.ResourceData, script string) (string, error) {
+func resourceShellScriptRun(cwd interface{}, shell, script string) (string, error) {
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 
-	cwd := d.Get("working_directory").(string)
-	cmd := exec.Command(d.Get("shell").(string))
+	cmd := exec.Command(shell)
 	cmd.Stdin = bytes.NewReader([]byte(script))
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	cmd.Dir = cwd
+	if cwd != nil {
+		cmd.Dir = cwd.(string)
+	}
 
 	err := cmd.Run()
 

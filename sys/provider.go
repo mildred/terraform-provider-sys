@@ -29,6 +29,8 @@ func Provider() *schema.Provider {
 		},
 		DataSourcesMap: map[string]*schema.Resource{
 			"sys_file": dataSourceFile(),
+			"sys_shell_script": dataSourceShellScript(),
+			"sys_error": dataSourceError(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}

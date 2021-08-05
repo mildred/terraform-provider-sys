@@ -1,3 +1,8 @@
+## 1.3.24
+
+* data source sys_shell_script: read data from a shell script
+* data source sys_error: trigger an error
+
 ## 1.3.23
 
 * sys_systemd_unit: fix unit active state not detected properly
