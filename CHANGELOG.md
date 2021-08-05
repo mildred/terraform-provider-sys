@@ -1,3 +1,7 @@
+## 1.3.25
+
+* sys_file: fix directory permissions (you may need to recreate the resources)
+
 ## 1.3.24
 
 * data source sys_shell_script: read data from a shell script

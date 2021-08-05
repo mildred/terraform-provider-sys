@@ -193,13 +193,20 @@ func resourceFileContent(d *schema.ResourceData) ([]byte, bool, error) {
 }
 
 func resourceFileUpdate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
-	destination, _, err := getDestination(d)
+	destination, is_directory, err := getDestination(d)
 	if err != nil {
 		return diag.Errorf("cdestination, %s", err)
 	}
 
-	if d.HasChange("file_permission") {
-		perm := d.Get("file_permission").(string)
+	var perm_name string
+	if is_directory {
+		perm_name = "directory_permission"
+	} else {
+		perm_name = "file_permission"
+	}
+
+	if d.HasChange(perm_name) {
+		perm := d.Get(perm_name).(string)
 		modeInt, _ := strconv.ParseInt(perm, 8, 64)
 		mode := os.FileMode(modeInt)
 
@@ -308,17 +315,17 @@ func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface
 		return diag.Errorf("finding destination, %v", err)
 	}
 
+	dirPerm := d.Get("directory_permission").(string)
+	dirMode, _ := strconv.ParseInt(dirPerm, 8, 64)
+
 	destinationDir := path.Dir(destination)
 	if _, err := os.Stat(destinationDir); err != nil {
-		dirPerm := d.Get("directory_permission").(string)
-		dirMode, _ := strconv.ParseInt(dirPerm, 8, 64)
 		if err := os.MkdirAll(destinationDir, os.FileMode(dirMode)); err != nil {
 			return diag.Errorf("cannot create parent directories, %v", err)
 		}
 	}
 
 	filePerm := d.Get("file_permission").(string)
-
 	fileMode, _ := strconv.ParseInt(filePerm, 8, 64)
 
 	if sourceSpecified {
@@ -386,7 +393,11 @@ func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface
 		checksum := sha1.Sum([]byte(content))
 		d.SetId(hex.EncodeToString(checksum[:]))
 	} else {
-		err = os.Chmod(destination, os.FileMode(fileMode))
+		if is_directory {
+			err = os.Chmod(destination, os.FileMode(dirMode))
+		} else {
+			err = os.Chmod(destination, os.FileMode(fileMode))
+		}
 		if err != nil {
 			return diag.Errorf("cannot chmod %s, %v", filePerm, err)
 		}
