@@ -32,6 +32,7 @@ echo "Making release for $ver"
 set -xe
 
 eval $(pass show sites/github.com | grep GITHUB_TOKEN)
+export GITHUB_TOKEN
 export GPG_FINGERPRINT=01230FD4CC29DE17
 
 if $overwrite; then
