@@ -1,3 +1,8 @@
+## 1.3.23
+
+* sys_systemd_unit: fix unit active state not detected properly
+* fix strings and add debug
+
 ## 1.3.22
 
 * sys_systemd_unit: fix deadlock in unit activation (appears on rollback)

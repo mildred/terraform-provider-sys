@@ -444,10 +444,13 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 	if err != nil || len(statuses) < 1 {
 		return fmt.Errorf("cannot query unit %s: %v", unit, err)
 	}
-	log.Printf("[TRACE] Activate %v %s (restart: %v): statuses = %v\n", activate, unit, restart, statuses)
-	status := statuses[0]
 
-	is_active := sdIsActive(status.LoadState)
+	log.Printf("[TRACE] Activate %v %s (restart: %v): statuses = %v\n", activate, unit, restart, statuses)
+
+	status := statuses[0]
+	is_active := sdIsActive(status.ActiveState)
+
+	log.Printf("[TRACE] Activate %v %s (restart: %v) active=%s is_active=%v activate=%v\n", activate, unit, restart, status.ActiveState, is_active, activate)
 
 	complete := make(chan string)
 
@@ -461,6 +464,7 @@ func resourceSystemdActivate(ctx context.Context, d *schema.ResourceData, sd *sy
 		log.Printf("[TRACE] Activate %v %s (restart: %v): systemctl stop %s\n", activate, unit, restart, unit)
 		_, err = sd.StopUnitContext(ctx, unit, "replace", complete)
 	} else {
+		log.Printf("[TRACE] Activate %v %s (restart: %v): nothing to do\n", activate, unit, restart)
 		close(complete)
 		return nil
 	}
@@ -515,6 +519,9 @@ func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceDa
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
+	log.Printf("[TRACE] Update %s start=%v has_start=%v enable=%v has_enable=%v mask=%v has_mask=%v rollback_active=%v rollback_enable=%v\n",
+		unit, start, has_start, enable, has_enable, mask, has_mask, rollback_active, rollback_enable)
+
 	if enable != nil && has_enable && d.HasChange("enable") {
 		err = resourceSystemdEnable(ctx, d, sd, enable.(bool))
 		if err != nil {
@@ -544,11 +551,12 @@ func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceDa
 	}
 
 	restart := d.HasChange("restart_on")
+	log.Printf("[TRACE] Update %s restart=%v\n", unit, restart)
 
 	if start != nil && has_start && (d.HasChange("start") || restart) {
 		err = resourceSystemdActivate(ctx, d, sd, start.(bool), restart)
 		if err != nil {
-			return diag.Errorf("cannot start unit %s: %v", sdStartString(start.(bool)), unit, err)
+			return diag.Errorf("cannot %s unit %s: %v", sdStartString(start.(bool)), unit, err)
 		}
 	} else if !has_start || start == nil {
 		err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
