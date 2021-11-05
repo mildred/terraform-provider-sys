@@ -47,7 +47,7 @@ func dataSourceShellScriptRead(d *schema.ResourceData, _ interface{}) error {
 	script := d.Get("read")
 	cwd := d.Get("working_directory")
 	shell := d.Get("shell").(string)
-	content, err := resourceShellScriptRun(cwd, shell, script.(string))
+	content, err := resourceShellScriptRun(cwd, shell, script.(string), true)
 	if err != nil {
 		return err
 	}

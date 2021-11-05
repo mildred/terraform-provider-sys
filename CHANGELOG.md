@@ -1,3 +1,8 @@
+## 1.3.30
+
+* sys_shell_script: fix some errors crashing the plugin, collect stdout with
+  intelligence
+
 ## 1.3.29
 
 * Fix broken tag 1.3.28
