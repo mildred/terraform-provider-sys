@@ -1,3 +1,7 @@
+## 1.3.29
+
+* Fix broken tag 1.3.28
+
 ## 1.3.28
 
 * rebuild documentation

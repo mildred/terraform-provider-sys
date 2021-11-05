@@ -66,11 +66,11 @@ Making a release
 
 From the [upstream documentation](https://www.terraform.io/docs/registry/providers/publishing.html):
 
-- `make docs` and commit
+- `make docs`, update changelog and commit
 - `export GPG_FINGERPRINT=01230FD4CC29DE17`
 - `export GITHUB_TOKEN=...`
 - Cache passphrase with `gpg --armor --detach-sign --local-user $GPG_FINGERPRINT </dev/null`
-- Create tag: `git tag -s -u $GPG_FINGERPRINT vx.x.x`
+- Create tag: `git tag -s -u $GPG_FINGERPRINT vx.x.x` and push it
 - Make release: `goreleaser release --rm-dist`
 - ~Publish release on GitHub~
 
