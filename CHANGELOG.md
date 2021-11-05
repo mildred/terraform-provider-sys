@@ -1,3 +1,7 @@
+## 1.3.32
+
+* sys_file.unlink_before_create allows to change inode
+
 ## 1.3.30
 
 * sys_shell_script: fix some errors crashing the plugin, collect stdout with

@@ -116,6 +116,12 @@ If the destination file exists, creation will block. However the resource has th
 				Optional:    true,
 				Default:     false,
 			},
+			"unlink_before_create": {
+			        Description: "Unlink file before creating it (allows to use a new inode)",
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+			},
 		},
 	}
 }
@@ -195,7 +201,7 @@ func resourceFileContent(d *schema.ResourceData) ([]byte, bool, error) {
 func resourceFileUpdate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	destination, is_directory, err := getDestination(d)
 	if err != nil {
-		return diag.Errorf("cdestination, %s", err)
+		return diag.Errorf("destination, %s", err)
 	}
 
 	var perm_name string
@@ -303,6 +309,7 @@ func checksumFile(destination string) (string, error) {
 func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface{}) diag.Diagnostics {
 	forceOverwrite := d.Get("force_overwrite").(bool)
 	clearDestination := d.Get("clear_destination").(bool)
+	unlinkBeforeCreate := d.Get("unlink_before_create").(bool)
 	symlink_destination := d.Get("symlink_destination").(bool)
 	source, sourceSpecified := d.GetOk("source")
 	content, contentSpecified, err := resourceFileContent(d)
@@ -338,6 +345,11 @@ func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface
 			err := os.RemoveAll(destination)
 			if err != nil {
 				return diag.Errorf("cannot delete target directory, %v", err)
+			}
+		} else if unlinkBeforeCreate {
+		        err := os.Remove(destination)
+			if err != nil {
+				return diag.Errorf("cannot unlink target before creation, %v", err)
 			}
 		}
 		get := &getter.Client{
