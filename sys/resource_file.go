@@ -348,7 +348,7 @@ func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface
 			}
 		} else if unlinkBeforeCreate {
 		        err := os.Remove(destination)
-			if err != nil {
+			if err != nil && ! os.IsNotExist(err) {
 				return diag.Errorf("cannot unlink target before creation, %v", err)
 			}
 		}
