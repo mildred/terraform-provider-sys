@@ -17,12 +17,13 @@ description: |-
 
 ### Optional
 
-- **create** (String)
-- **delete** (String)
-- **filename** (String)
+- **create** (String) Script to construct the resource, in addition to `make`. Must output on the standard output the resource id (used to determine if the resource needs to be reconstructed).
+- **delete** (String) Script to delete the resource
+- **filename** (String) Filename created by the resource, can be used to avoid implementing `read`. The file is removed on resource deletion.
 - **id** (String) The ID of this resource.
-- **read** (String)
-- **shell** (String)
-- **working_directory** (String)
+- **make** (String) Script to construct the resource (does not read the value)
+- **read** (String) Script that reads the resource id on the standard output
+- **shell** (String) Shell to use
+- **working_directory** (String) Working directory where to run the script
 
 

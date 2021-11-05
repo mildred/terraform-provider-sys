@@ -1,3 +1,16 @@
+## 1.3.28
+
+* rebuild documentation
+
+## 1.3.27
+
+* sys_shell_script: have a make script that avoids reimplementing read in the
+  create script
+
+## 1.3.26
+
+* data source sys_os_releaase: parse /etc/os-release
+
 ## 1.3.25
 
 * sys_file: fix directory permissions (you may need to recreate the resources)

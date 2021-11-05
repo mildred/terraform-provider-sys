@@ -33,7 +33,7 @@ If the destination file exists, creation will block. However the resource has th
 - **content** (String) The content of file to create. Conflicts with `sensitive_content` and `content_base64`.
 - **content_base64** (String) The base64 encoded content of the file to create. Use this when dealing with binary data. Conflicts with `content` and `sensitive_content`.
 - **directory_permission** (String) (default: "0777") The permission to set for any directories created. Expects a string.
-- **file_permission** (String) (default: "0777") The permission to set for the created file. Expects an a string.
+- **file_permission** (String) (default: "0666") The permission to set for the created file. Expects an a string.
 - **filename** (String) (Required unless `target_directory` is specified) The path of the file to create.
 - **force_overwrite** (Boolean) (default: false) When `true`, allows to overwrite target file or directory.
 - **id** (String) The ID of this resource.
