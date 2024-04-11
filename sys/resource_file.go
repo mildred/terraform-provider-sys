@@ -98,6 +98,19 @@ If the destination file exists, creation will block. However the resource has th
 				Default:      "0777",
 				ValidateFunc: validateMode,
 			},
+			/*
+			"user": {
+				Description: "User to write the file as (works only as root)",
+				Type: schema.TypeString,
+				Optional: true,
+				Default: false,
+			}
+			"group": {
+				Description: "Group to write the file as (works only as root)",
+				Type: schema.TypeString,
+				Optional: true,
+				Default: false,
+			}*/
 			"force_overwrite": {
 				Description: "(default: false) When `true`, allows to overwrite target file or directory.",
 				Type:        schema.TypeBool,
@@ -111,7 +124,7 @@ If the destination file exists, creation will block. However the resource has th
 				Default:     false,
 			},
 			"symlink_destination": {
-				Description: "(default: false) Symlink destination if source is a directory and target_directory is set.",
+				Description: "(default: false) Symlink destination if source is a directory and target_directory is set. Consider using sys_symlink resource",
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
@@ -149,6 +162,9 @@ func resourceFileRead(ctx context.Context, d *schema.ResourceData, _ interface{}
 	if os.IsNotExist(err) {
 		d.SetId("")
 		return nil
+	}
+	if err != nil {
+		return diag.Errorf("stat failed, %v", err)
 	}
 
 	same, err := utils.FileModeSame(d.Get("file_permission").(string), st.Mode(), utils.Umask)

@@ -28,10 +28,11 @@ func Provider() *schema.Provider {
 			"sys_systemd_unit": resourceSystemdUnit(),
 		},
 		DataSourcesMap: map[string]*schema.Resource{
-		        "sys_os_release": dataSourceOsRelease(),
-			"sys_file": dataSourceFile(),
+		        "sys_os_release":   dataSourceOsRelease(),
+			"sys_file":         dataSourceFile(),
 			"sys_shell_script": dataSourceShellScript(),
-			"sys_error": dataSourceError(),
+			"sys_error":        dataSourceError(),
+			"uname":            dataSourceUname(),
 		},
 		ConfigureContextFunc: providerConfigure,
 	}
