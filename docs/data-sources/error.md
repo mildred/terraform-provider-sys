@@ -17,8 +17,9 @@ description: |-
 
 ### Optional
 
-- **error** (Boolean)
-- **id** (String) The ID of this resource.
-- **message** (String)
+- `error` (Boolean)
+- `message` (String)
 
+### Read-Only
 
+- `id` (String) The ID of this resource.

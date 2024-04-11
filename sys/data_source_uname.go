@@ -6,7 +6,6 @@ import (
 	"strings"
 	"regexp"
 	"os/exec"
-	"io/ioutil"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -14,12 +13,13 @@ import (
 func dataSourceUname() *schema.Resource {
 	return &schema.Resource{
 		Read: dataSourceUnameRead,
+		Description: "Return values from the uname executable",
 
 		Schema: map[string]*schema.Schema{
 			"flag": {
 				Type:        schema.TypeString,
 				Default:     "a",
-				Optional:    true
+				Optional:    true,
 				ForceNew:    true,
 				Description: `Uname flag without the dash: a: all, s: kernel name, n: nodename, r: kernel release, v: kernel version, m: machine, p: processor, i: hardware platform, o: operating system`,
 			},
@@ -72,7 +72,10 @@ func dataSourceUname() *schema.Resource {
 	}
 }
 
-uname_all_regexp := regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(.+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$`)
+var uname_all_regexp *regexp.Regexp
+func init(){
+	uname_all_regexp = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(.+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$`)
+}
 
 func dataSourceUnameRead(d *schema.ResourceData, _ interface{}) error {
 	flag := d.Get("flag").(string)

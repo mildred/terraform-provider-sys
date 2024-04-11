@@ -105,6 +105,12 @@ func resourceSystemdUnit() *schema.Resource {
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
+			"ignore_errors": {
+				Description: "Ignore errors",
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+			},
 		},
 	}
 }
@@ -237,6 +243,15 @@ func sdUnitLock(m interface{}, unit string) sync.Locker {
 	return lock
 }
 
+func withSeverity(d *schema.ResourceData, errs diag.Diagnostics) diag.Diagnostics {
+	if d.Get("ignore_errors").(bool) {
+		for i := range errs {
+			errs[i].Severity = diag.Warning
+		}
+	}
+	return errs
+}
+
 func resourceSystemdUnitRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	unit := d.Get("name").(string)
 	log.Printf("[DEBUG] About to read %s\n", unit)
@@ -347,7 +362,7 @@ func resourceSystemdUnitCreate(ctx context.Context, d *schema.ResourceData, m in
 		return errs
 	}
 
-	return resourceSystemdUnitUpdateUnlocked(ctx, d, m)
+	return resourceSystemdUnitUpdateUnlocked(ctx, d, m, true)
 }
 
 func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -384,7 +399,8 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	log.Printf("[DEBUG] Rollback %s %s\n", sdEnableString(rollback_enable), unit)
 	err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 	if err != nil {
-		return diag.Errorf("cannot %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+		derr := diag.Errorf("cannot %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+		return withSeverity(d, derr)
 	}
 
 	restart := d.HasChange("restart_on")
@@ -392,7 +408,8 @@ func resourceSystemdUnitDelete(ctx context.Context, d *schema.ResourceData, m in
 	log.Printf("[DEBUG] Rollback %s %s (restart: %v)\n", sdStartString(rollback_active), unit, restart)
 	err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
 	if err != nil {
-		return diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
+		derr := diag.Errorf("cannot %s unit %s: %v", sdStartString(rollback_active), unit, err)
+		return withSeverity(d, derr)
 	}
 
 	log.Printf("[DEBUG] Read unit %s after rollback\n", unit)
@@ -492,10 +509,10 @@ func resourceSystemdUnitUpdate(ctx context.Context, d *schema.ResourceData, m in
 	lock.Lock()
 	defer lock.Unlock()
 
-	return resourceSystemdUnitUpdateUnlocked(ctx, d, m)
+	return resourceSystemdUnitUpdateUnlocked(ctx, d, m, false)
 }
 
-func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceData, m interface{}, creating bool) diag.Diagnostics {
 	unit := d.Get("name").(string)
 
 	sd, err := sdConn(ctx, d, m)
@@ -522,46 +539,52 @@ func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceDa
 	log.Printf("[TRACE] Update %s start=%v has_start=%v enable=%v has_enable=%v mask=%v has_mask=%v rollback_active=%v rollback_enable=%v\n",
 		unit, start, has_start, enable, has_enable, mask, has_mask, rollback_active, rollback_enable)
 
-	if enable != nil && has_enable && d.HasChange("enable") {
+	if enable != nil && has_enable && (creating || d.HasChange("enable")) {
 		err = resourceSystemdEnable(ctx, d, sd, enable.(bool))
 		if err != nil {
-			return diag.Errorf("cannot %s unit %s: %v", sdEnableString(enable.(bool)), unit, err)
+			derr := diag.Errorf("cannot %s unit %s: %v", sdEnableString(enable.(bool)), unit, err)
+			return withSeverity(d, derr)
 		}
 	} else if !has_enable || enable == nil {
 		err = resourceSystemdEnable(ctx, d, sd, rollback_enable)
 		if err != nil {
-			return diag.Errorf("cannot rollback %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+			derr := diag.Errorf("cannot rollback %s unit %s: %v", sdEnableString(rollback_enable), unit, err)
+			return withSeverity(d, derr)
 		}
 	}
 
-	if mask != nil && has_mask && d.HasChange("mask") {
+	if mask != nil && has_mask && (creating || d.HasChange("mask")) {
 		var maskState string
 		if mask.(bool) {
 			maskState = systemdMasked
 		}
 		err = resourceSystemdMask(ctx, d, sd, maskState)
 		if err != nil {
-			return diag.Errorf("cannot %s unit %s: %v", sdMaskString(mask.(bool)), unit, err)
+			derr := diag.Errorf("cannot %s unit %s: %v", sdMaskString(mask.(bool)), unit, err)
+			return withSeverity(d, derr)
 		}
 	} else if rollback_load_state != nil && (!has_mask || mask == nil) {
 		err = resourceSystemdMask(ctx, d, sd, rollback_load_state.(string))
 		if err != nil {
-			return diag.Errorf("cannot rollback %s unit %s: %v", sdMaskString(sdIsMasked(rollback_load_state.(string))), unit, err)
+			derr := diag.Errorf("cannot rollback %s unit %s: %v", sdMaskString(sdIsMasked(rollback_load_state.(string))), unit, err)
+			return withSeverity(d, derr)
 		}
 	}
 
 	restart := d.HasChange("restart_on")
 	log.Printf("[TRACE] Update %s restart=%v\n", unit, restart)
 
-	if start != nil && has_start && (d.HasChange("start") || restart) {
+	if start != nil && has_start && (creating || d.HasChange("start") || restart) {
 		err = resourceSystemdActivate(ctx, d, sd, start.(bool), restart)
 		if err != nil {
-			return diag.Errorf("cannot %s unit %s: %v", sdStartString(start.(bool)), unit, err)
+			derr := diag.Errorf("cannot %s unit %s: %v", sdStartString(start.(bool)), unit, err)
+			return withSeverity(d, derr)
 		}
 	} else if !has_start || start == nil {
 		err = resourceSystemdActivate(ctx, d, sd, rollback_active, restart)
 		if err != nil {
-			return diag.Errorf("cannot rollback %s unit %s: %v", sdStartString(rollback_active), unit, err)
+			derr := diag.Errorf("cannot rollback %s unit %s: %v", sdStartString(rollback_active), unit, err)
+			return withSeverity(d, derr)
 		}
 	}
 

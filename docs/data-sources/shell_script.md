@@ -17,17 +17,15 @@ description: |-
 
 ### Required
 
-- **read** (String) Shell script to read the value
+- `read` (String) Shell script to read the value
 
 ### Optional
 
-- **id** (String) The ID of this resource.
-- **shell** (String)
-- **working_directory** (String)
+- `shell` (String)
+- `working_directory` (String)
 
 ### Read-Only
 
-- **content** (String)
-- **content_base64** (String)
-
-
+- `content` (String)
+- `content_base64` (String)
+- `id` (String) The ID of this resource.

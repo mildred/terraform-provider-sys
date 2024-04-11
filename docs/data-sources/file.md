@@ -17,15 +17,10 @@ description: |-
 
 ### Required
 
-- **filename** (String) Path to the output file
-
-### Optional
-
-- **id** (String) The ID of this resource.
+- `filename` (String) Path to the output file
 
 ### Read-Only
 
-- **content** (String)
-- **content_base64** (String)
-
-
+- `content` (String)
+- `content_base64` (String)
+- `id` (String) The ID of this resource.

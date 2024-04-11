@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/mildred/terraform-provider-sys/sys/file_getter"
+	// "github.com/mildred/terraform-provider-sys/sys/file_getter"
 	"github.com/mildred/terraform-provider-sys/sys/utils"
 )
 
@@ -374,7 +374,7 @@ func resourceFileCreate(ctx context.Context, d *schema.ResourceData, _ interface
 		}
 
 		if !symlink_destination {
-			fileGetter := new(file_getter.FileGetter)
+			fileGetter := new(getter.FileGetter)
 			get.Getters = append([]getter.Getter{fileGetter}, get.Getters...)
 		}
 
