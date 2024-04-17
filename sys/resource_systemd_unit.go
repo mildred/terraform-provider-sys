@@ -431,9 +431,13 @@ func resourceSystemdEnable(ctx context.Context, d *schema.ResourceData, sd *syst
 	is_enabled := sdIsEnabled(unitFileState)
 
 	if !is_enabled && enable {
+		log.Printf("[TRACE] Enable %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
 		_, _, err = sd.EnableUnitFilesContext(ctx, []string{unit}, false, true)
 	} else if is_enabled && !enable {
+		log.Printf("[TRACE] Disasble %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
 		_, err = sd.DisableUnitFilesContext(ctx, []string{unit}, false)
+	} else {
+		log.Printf("[TRACE] Do not enable %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
 	}
 
 	return err
@@ -447,9 +451,13 @@ func resourceSystemdMask(ctx context.Context, d *schema.ResourceData, sd *system
 	}
 
 	if maskState != unitFileState && sdIsMasked(maskState) {
+		log.Printf("[TRACE] Mask (%s) %s (state=%v, is_masked=%v, do_mask=%v)\n", maskState, unit, unitFileState, sdIsMasked(maskState), sdIsMasked(maskState))
 		_, err = sd.MaskUnitFilesContext(ctx, []string{unit}, maskState == systemdMaskedRuntime, true)
 	} else if sdIsMasked(unitFileState) && !sdIsMasked(maskState) {
+		log.Printf("[TRACE] Unmask (%s) %s (state=%v, is_masked=%v, do_mask=%v)\n", maskState, unit, unitFileState, sdIsMasked(maskState), sdIsMasked(maskState))
 		_, err = sd.UnmaskUnitFilesContext(ctx, []string{unit}, false)
+	} else {
+		log.Printf("[TRACE] Do not mask (%s) %s (state=%v, is_masked=%v, do_mask=%v)\n", maskState, unit, unitFileState, sdIsMasked(maskState), sdIsMasked(maskState))
 	}
 
 	return err

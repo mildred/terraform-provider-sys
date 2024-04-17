@@ -10,6 +10,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
+var uname_all_regexp *regexp.Regexp
+func init(){
+	uname_all_regexp = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(.+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$`)
+}
+
 func dataSourceUname() *schema.Resource {
 	return &schema.Resource{
 		Read: dataSourceUnameRead,
@@ -70,11 +75,6 @@ func dataSourceUname() *schema.Resource {
 			},
 		},
 	}
-}
-
-var uname_all_regexp *regexp.Regexp
-func init(){
-	uname_all_regexp = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(.+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$`)
 }
 
 func dataSourceUnameRead(d *schema.ResourceData, _ interface{}) error {
