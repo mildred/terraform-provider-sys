@@ -186,12 +186,14 @@ func sdStartString(start bool) string {
 	}
 }
 
-func sdIsEnabled(unit_file_state string) bool {
+func sdIsEnabled(unit_file_state string) (bool, bool) {
 	switch unit_file_state {
-	case systemdEnabled, systemdEnabledRuntime, systemdStatic, systemdAlias, systemdIndirect, systemdGenerated:
-		return true
+	case systemdStatic, systemdEnabledRuntime, systemdAlias, systemdIndirect, systemdGenerated:
+		return true, false
+	case systemdEnabled:
+		return true, true
 	default:
-		return false
+		return false, true
 	}
 }
 
@@ -309,7 +311,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 			return diag.Errorf("cannot get unit file state for %s: %v", status.Name, err)
 		}
 
-		enabled := sdIsEnabled(unitFileState)
+		enabled, _ := sdIsEnabled(unitFileState)
 		active := sdIsActive(status.ActiveState)
 		masked := sdIsMasked(status.LoadState)
 		rollback["active"] = strconv.FormatBool(active)
@@ -428,16 +430,16 @@ func resourceSystemdEnable(ctx context.Context, d *schema.ResourceData, sd *syst
 		return fmt.Errorf("cannot get unit file state for %s: %v", unit, err)
 	}
 
-	is_enabled := sdIsEnabled(unitFileState)
+	is_enabled, is_enableable := sdIsEnabled(unitFileState)
 
-	if !is_enabled && enable {
-		log.Printf("[TRACE] Enable %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
+	if is_enableable && !is_enabled && enable {
+		log.Printf("[TRACE] Enable %s (enable=%v, is_enabled=%v, is_enableable=%v)\n", unit, enable, is_enabled, is_enableable)
 		_, _, err = sd.EnableUnitFilesContext(ctx, []string{unit}, false, true)
-	} else if is_enabled && !enable {
-		log.Printf("[TRACE] Disasble %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
+	} else if is_enableable && is_enabled && !enable {
+		log.Printf("[TRACE] Disasble %s (enable=%v, is_enabled=%v, is_enableable=%v)\n", unit, enable, is_enabled, is_enableable)
 		_, err = sd.DisableUnitFilesContext(ctx, []string{unit}, false)
 	} else {
-		log.Printf("[TRACE] Do not enable %s (enable=%v, is_enabled=%v)\n", unit, enable, is_enabled)
+		log.Printf("[TRACE] Do not enable %s (enable=%v, is_enabled=%v, is_enableable=%v)\n", unit, enable, is_enabled, is_enableable)
 	}
 
 	return err
@@ -535,17 +537,18 @@ func resourceSystemdUnitUpdateUnlocked(ctx context.Context, d *schema.ResourceDa
 	mask, has_mask := d.GetOkExists("mask")
 
 	rollback := d.Get("rollback").(map[string]interface{})
-	rollback_active := parseBoolDef(rollback["active"], false)
-	rollback_enable := parseBoolDef(rollback["enabled"], false)
+	rollback_active     := parseBoolDef(rollback["active"], false)
+	rollback_enable     := parseBoolDef(rollback["enabled"], false)
 	rollback_load_state := rollback["load_state"]
+	rollback_file_state := rollback["unit_file_state"]
 
 	err = sd.ReloadContext(ctx)
 	if err != nil {
 		return diag.Errorf("cannot reload systemd: %v", err)
 	}
 
-	log.Printf("[TRACE] Update %s start=%v has_start=%v enable=%v has_enable=%v mask=%v has_mask=%v rollback_active=%v rollback_enable=%v\n",
-		unit, start, has_start, enable, has_enable, mask, has_mask, rollback_active, rollback_enable)
+	log.Printf("[TRACE] Update %s start=%v has_start=%v enable=%v has_enable=%v mask=%v has_mask=%v rollback_active=%v rollback_enable=%v, rollback_load_state=%v, rollback_file_state=%v\n",
+		unit, start, has_start, enable, has_enable, mask, has_mask, rollback_active, rollback_enable, rollback_load_state, rollback_file_state)
 
 	if enable != nil && has_enable && (creating || d.HasChange("enable")) {
 		err = resourceSystemdEnable(ctx, d, sd, enable.(bool))
