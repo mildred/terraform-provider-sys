@@ -311,7 +311,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 			return diag.Errorf("cannot get unit file state for %s: %v", status.Name, err)
 		}
 
-		enabled, _ := sdIsEnabled(unitFileState)
+		enabled, enableable := sdIsEnabled(unitFileState)
 		active := sdIsActive(status.ActiveState)
 		masked := sdIsMasked(status.LoadState)
 		rollback["active"] = strconv.FormatBool(active)
@@ -322,7 +322,7 @@ func resourceSystemdUnitReadUnlocked(ctx context.Context, d *schema.ResourceData
 		if _, has_start := d.GetOkExists("start"); has_start {
 			d.Set("start", active)
 		}
-		if _, has_enable := d.GetOkExists("enable"); has_enable {
+		if _, has_enable := d.GetOkExists("enable"); has_enable && enableable {
 			d.Set("enable", enabled)
 		}
 		if _, has_mask := d.GetOkExists("mask"); has_mask {
