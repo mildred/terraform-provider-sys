@@ -71,7 +71,7 @@ From the [upstream documentation](https://www.terraform.io/docs/registry/provide
 - `export GITHUB_TOKEN=...`
 - Cache passphrase with `gpg --armor --detach-sign --local-user $GPG_FINGERPRINT </dev/null`
 - Create tag: `git tag -s -u $GPG_FINGERPRINT vx.x.x` and push it
-- Make release: `goreleaser release --rm-dist`
+- Make release: `goreleaser release --rm-dist` (use goreleaser v1.x)
 - ~Publish release on GitHub~
 
 Test out the provider before making the release

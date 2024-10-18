@@ -100,7 +100,7 @@ func resourceDirCreate(d *schema.ResourceData, _ interface{}) error {
 
 	destinationDir := path.Dir(destination)
 	if _, err := os.Stat(destinationDir); err != nil {
-		dirPerm := d.Get("directory_permission").(string)
+		dirPerm := d.Get("permission").(string)
 		dirMode, _ := strconv.ParseInt(dirPerm, 8, 64)
 		if err := os.MkdirAll(destinationDir, os.FileMode(dirMode)); err != nil {
 			return err
